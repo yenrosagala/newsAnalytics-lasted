@@ -1,0 +1,252 @@
+diff --git a/app/core/auth.py b/app/core/auth.py
+index 1e60699..13f1533 100644
+--- a/app/core/auth.py
++++ b/app/core/auth.py
+@@ -7,6 +7,29 @@ def init_auth_session():
+         st.session_state.role = None
+         st.session_state.username = ""
+ 
++
++def is_authenticated() -> bool:
++    """
++    Mengecek status login pengguna.
++    st.session_state bersifat per-browser-session dan dibagikan ke SEMUA
++    halaman pada aplikasi multipage Streamlit ini -- jadi begitu status ini
++    True di sini, ia akan tetap True saat pengguna berpindah ke halaman lain
++    (Scraping/Dashboard/Fenomena) TANPA perlu login ulang, selama tab
++    browser yang sama tidak ditutup atau di-refresh penuh.
++    """
++    return bool(st.session_state.get("authenticated", False))
++
++
++def require_login():
++    """
++    Dipanggil di baris paling atas setiap halaman yang butuh proteksi login.
++    Menghentikan render halaman (st.stop()) jika pengguna belum login.
++    """
++    if not is_authenticated():
++        st.warning("⚠️ Silakan lakukan otorisasi akses (Login) melalui halaman utama (Homepage) terlebih dahulu.")
++        st.stop()
++
++
+ def render_login_form():
+     """Merender form login di sidebar atau halaman utama."""
+     st.sidebar.subheader("🔒 Masuk ke Sistem")
+diff --git a/app/services/database_service.py b/app/services/database_service.py
+index 1649e63..827c4b6 100644
+--- a/app/services/database_service.py
++++ b/app/services/database_service.py
+@@ -13,7 +13,13 @@ class DatabaseService:
+ 
+     def __init__(self):
+         self.supabase_url = st.secrets.get("SUPABASE_URL", "https://qbqvtdhaktjbohyfwkvi.supabase.co")
+-        self.default_api_key = st.secrets.get("SUPABASE_PUBLISHABLE_KEY", "")
++        # Supabase menamai ulang "anon key" menjadi "Publishable key" di sistem API key
++        # baru mereka. Kita cek beberapa kemungkinan nama secret agar tidak gampang salah ketik.
++        self.default_api_key = (
++            st.secrets.get("SUPABASE_PUBLISHABLE_KEY", "")
++            or st.secrets.get("SUPABASE_ANON_KEY", "")
++            or st.secrets.get("SUPABASE_KEY", "")
++        )
+ 
+     def _get_client(self, custom_api_key: str = None) -> Client:
+         """Helper untuk membuat client dengan opsional API Key (untuk admin)."""
+diff --git a/app/services/scraper_service.py b/app/services/scraper_service.py
+index 3342d57..5210f5e 100644
+--- a/app/services/scraper_service.py
++++ b/app/services/scraper_service.py
+@@ -188,8 +188,8 @@ class ScraperService:
+         if progress_bar:
+             progress_bar.progress(1.0)
+         return saved_count
+-        
+-def _extract_article_metadata(self, url: str, fallback_title: str = "", fallback_desc: str = "") -> dict:
++
++    def _extract_article_metadata(self, url: str, fallback_title: str = "", fallback_desc: str = "") -> dict:
+         """
+         Mengambil metadata lengkap artikel menggunakan newspaper4k:
+         - Nama media dari domain URL
+diff --git a/pages/1_Scraping.py b/pages/1_Scraping.py
+index 49eb6cf..35e239f 100644
+--- a/pages/1_Scraping.py
++++ b/pages/1_Scraping.py
+@@ -8,6 +8,7 @@ from app.core.config import Config
+ from app.core.logger import setup_logger
+ from app.generate_pdf import generate_pdf_report
+ from app.prompts.executive_summary import get_executive_summary_prompt
++from app.core.auth import require_login
+ 
+ # Inisialisasi konfigurasi
+ config = Config()
+@@ -16,9 +17,7 @@ logger = setup_logger("page_scraping")
+ st.set_page_config(page_title="FlashNews: News Scraper", layout="wide", page_icon="📰")
+ 
+ # --- PROTEKSI HALAMAN ---
+-if not st.session_state.get("authenticated", False):
+-    st.warning("⚠️ Silakan lakukan otorisasi akses (Login) melalui halaman utama (Homepage) terlebih dahulu.")
+-    st.stop()
++require_login()
+ 
+ try:
+     with open("app/assets/style.css") as f:
+diff --git a/pages/2_Dashboard.py b/pages/2_Dashboard.py
+index 223eb7c..3d699bf 100644
+--- a/pages/2_Dashboard.py
++++ b/pages/2_Dashboard.py
+@@ -5,6 +5,7 @@ import plotly.express as px
+ from app.services.database_service import db_service
+ from app.core.config import Config
+ from app.core.logger import setup_logger
++from app.core.auth import require_login
+ 
+ config = Config()
+ logger = setup_logger("page_dashboard")
+@@ -12,9 +13,7 @@ logger = setup_logger("page_dashboard")
+ st.set_page_config(page_title="FlashNews: Database Management", layout="wide", page_icon="📊")
+ 
+ # --- PROTEKSI HALAMAN ---
+-if not st.session_state.get("authenticated", False):
+-    st.warning("⚠️ Silakan lakukan otorisasi akses (Login) melalui halaman utama (Homepage) terlebih dahulu.")
+-    st.stop()
++require_login()
+ 
+ try:
+     with open("app/assets/style.css") as f:
+diff --git a/pages/3_Fenomena.py b/pages/3_Fenomena.py
+index dbe2165..70a5db5 100644
+--- a/pages/3_Fenomena.py
++++ b/pages/3_Fenomena.py
+@@ -8,6 +8,7 @@ from app.core.config import Config
+ from app.core.logger import setup_logger
+ from app.generate_pdf import generate_pdf_report
+ from app.prompts.executive_summary import get_executive_summary_prompt
++from app.core.auth import require_login
+ 
+ config = Config()
+ logger = setup_logger("page_fenomena")
+@@ -15,9 +16,7 @@ logger = setup_logger("page_fenomena")
+ st.set_page_config(page_title="FlashNews: Root Cause Analysis", layout="wide", page_icon="🧠")
+ 
+ # --- PROTEKSI HALAMAN ---
+-if not st.session_state.get("authenticated", False):
+-    st.warning("⚠️ Silakan lakukan otorisasi akses (Login) melalui halaman utama (Homepage) terlebih dahulu.")
+-    st.stop()
++require_login()
+ 
+ try:
+     with open("app/assets/style.css") as f:
+diff --git a/streamlit_app.py b/streamlit_app.py
+index da89931..dea8cc1 100644
+--- a/streamlit_app.py
++++ b/streamlit_app.py
+@@ -3,13 +3,18 @@ from app.core.config import Config
+ from app.core.logger import get_logger
+ from app.utils.session import init_state
+ from app.utils.session import init_session_state
+-from app.core.auth import render_login_form, render_logout
++from app.core.auth import render_login_form, render_logout, is_authenticated
+ 
+ # 1. Setup Logger
+ logger = get_logger("MainApp")
+ logger.info("Aplikasi Google News Scrapper berhasil dimuat.")
+-# streamlit_app.py
+-# Gantikan logika state_manager dengan ini:
++
++
++# 2. Inisialisasi Session State Terpusat
++# 'authenticated' disimpan di st.session_state, yang otomatis dibagikan ke
++# SEMUA halaman (Scraping/Dashboard/Fenomena) selama tab browser yang sama
++# masih terbuka -- jadi login cukup sekali per sesi, tidak perlu login ulang
++# setiap pindah halaman.
+ def init_app_state():
+     init_session_state("authenticated", False)
+     init_session_state("role", "user")
+@@ -18,40 +23,73 @@ def init_app_state():
+ 
+ init_app_state()
+ 
+-# 2. Konfigurasi Halaman Streamlit
++# 3. Konfigurasi Halaman Streamlit
+ st.set_page_config(page_title=Config.PAGE_TITLE, page_icon=Config.PAGE_ICON, layout=Config.LAYOUT)
+ 
+-# 3. Inject CSS Eksternal
++# 4. Inject CSS Eksternal
+ try:
+     with open("app/assets/style.css") as f:
+         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+ except FileNotFoundError:
+     logger.warning("File style.css tidak ditemukan di folder assets. Menggunakan style default.")
+ 
+-# 4. Inisialisasi State Awal Aplikasi
++# 5. Inisialisasi State Awal Aplikasi
+ init_state("search_keyword", "")
+ init_state("is_scrapped", False)
+ 
+-# 4b. Login / Logout di Sidebar (sebelumnya tidak pernah dirender, sehingga
+-# 'authenticated' tidak pernah bernilai True dan semua halaman terkunci)
+-if st.session_state.get("authenticated", False):
++# 6. Login / Logout di Sidebar
++if is_authenticated():
+     st.sidebar.success(f"Masuk sebagai: **{st.session_state.get('role', 'user').capitalize()}**")
+     render_logout()
+ else:
+     render_login_form()
+ 
+-# 5. Tampilan Halaman Utama (Home / Landing Page)
++# 7. Header Halaman Utama
+ st.markdown("<div class='main-header'>📰 Google News Scraper & Sentiment Analyzer</div>", unsafe_allow_html=True)
+ 
+ st.markdown("""
+ ### Selamat Datang di Aplikasi Analisis Berita
+-Aplikasi ini dirancang untuk membantu Anda melakukan *scraping* berita dari Google News secara otomatis, 
++Aplikasi ini dirancang untuk membantu Anda melakukan *scraping* berita dari Google News secara otomatis,
+ menganalisis sentimen publik, dan mengekspor hasilnya ke dalam format laporan yang siap pakai.
+-
+-#### 👈 Silakan Pilih Menu di Samping untuk Memulai:
+-1. **Scraping**: Untuk mengambil data berita terbaru berdasarkan kata kunci.
+-2. **Dashboard**: Untuk melihat visualisasi data dan analisis sentimen berita yang telah diambil.
+-3. **Fenomena**: Untuk menjalankan analisis akar masalah (Root Cause / 5-Why) secara bertingkat.
+ """)
+ 
+-st.info("Gunakan menu navigasi di *sidebar* sebelah kiri untuk berpindah halaman.")
+\ No newline at end of file
++st.divider()
++
++# 8. Menu Utama di Halaman Tengah (bukan hanya di sidebar)
++if is_authenticated():
++    st.markdown("#### 🚀 Pilih Menu untuk Memulai")
++else:
++    st.info("🔒 Silakan login terlebih dahulu melalui sidebar di sebelah kiri untuk mengakses menu di bawah ini.")
++    st.markdown("#### 🚀 Menu Aplikasi (login untuk mengakses)")
++
++menu_items = [
++    {
++        "icon": "📰",
++        "title": "Scraping",
++        "desc": "Ambil berita terbaru dari Google News berdasarkan kata kunci, lalu hasilkan ringkasan eksekutif otomatis.",
++        "page": "pages/1_Scraping.py",
++    },
++    {
++        "icon": "📊",
++        "title": "Dashboard",
++        "desc": "Visualisasikan data berita yang sudah tersimpan: distribusi sentimen, media kontributor, dan detail artikel.",
++        "page": "pages/2_Dashboard.py",
++    },
++    {
++        "icon": "🧠",
++        "title": "Fenomena",
++        "desc": "Jalankan analisis akar masalah (Root Cause / 5-Why) secara bertingkat terhadap sebuah topik/fenomena.",
++        "page": "pages/3_Fenomena.py",
++    },
++]
++
++cols = st.columns(3)
++for col, item in zip(cols, menu_items):
++    with col:
++        with st.container(border=True):
++            st.markdown(f"### {item['icon']} {item['title']}")
++            st.caption(item["desc"])
++            st.page_link(item["page"], label=f"Buka {item['title']}", icon="➡️", width='stretch')
++
++st.divider()
++st.info("💡 Anda juga bisa berpindah halaman kapan saja lewat menu navigasi di *sidebar* sebelah kiri.")

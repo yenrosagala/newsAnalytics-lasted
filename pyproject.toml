@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "google-news-scraper"
+version = "1.0.0"
+requires-python = ">=3.11,<3.13"
+
+[tool.uv]
+package = false

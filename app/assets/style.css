@@ -1,0 +1,852 @@
+/* =========================================================
+   NewsAnalytics AI -- Glassmorphism Theme
+   Palet: primary blue #2563eb, translucent frosted glass cards,
+   backdrop-blur, subtle borders, and glowing shadows.
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --tbl-primary: #2563eb;
+    --tbl-primary-dark: #1d4ed8;
+    --tbl-primary-soft: rgba(37, 99, 235, 0.12);
+    --tbl-primary-soft-2: rgba(37, 99, 235, 0.2);
+    
+    /* Glassmorphism Color Variables */
+    --tbl-body-bg: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+    --tbl-card-bg: rgba(255, 255, 255, 0.65);
+    --tbl-card-bg-hover: rgba(255, 255, 255, 0.85);
+    --tbl-border: rgba(255, 255, 255, 0.8);
+    --tbl-border-strong: rgba(203, 213, 225, 0.6);
+    
+    --tbl-text: #1e293b;
+    --tbl-text-muted: #64748b;
+    --tbl-radius-lg: 16px;
+    --tbl-radius: 12px;
+    --tbl-radius-sm: 8px;
+    
+    --tbl-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    --tbl-shadow-hover: 0 12px 40px 0 rgba(31, 38, 135, 0.12);
+    
+    --tbl-success: #10b981;
+    --tbl-warning: #f59e0b;
+    --tbl-danger: #ef4444;
+    --tbl-font: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* =========================================================
+   1. GLOBAL RESET
+   ========================================================= */
+html, body, .stApp {
+    background: var(--tbl-body-bg) !important;
+    background-attachment: fixed !important;
+    color: var(--tbl-text) !important;
+    font-family: var(--tbl-font) !important;
+}
+
+header, footer { visibility: hidden !important; }
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--tbl-text) !important;
+    text-shadow: none !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.01em;
+}
+
+p, li, span, label, [data-testid="stExpanderDetails"] p, [data-testid="stCaptionContainer"] {
+    color: var(--tbl-text) !important;
+    font-weight: 400 !important;
+}
+
+[data-testid="stCaptionContainer"] {
+    color: var(--tbl-text-muted) !important;
+    font-size: 0.875rem !important;
+}
+
+hr { border-color: var(--tbl-border-strong) !important; }
+
+/* =========================================================
+   2. CARDS (Glassmorphism Effect)
+   ========================================================= */
+.premium-card, .main-title, .kpi-box, div[data-testid="stForm"] {
+    background: var(--tbl-card-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--tbl-border) !important;
+    border-radius: var(--tbl-radius-lg) !important;
+    padding: 22px !important;
+    box-shadow: var(--tbl-shadow) !important;
+}
+
+.kpi-box:hover {
+    transform: translateY(-2px);
+    background: var(--tbl-card-bg-hover) !important;
+    border-color: rgba(37, 99, 235, 0.4) !important;
+    box-shadow: var(--tbl-shadow-hover) !important;
+}
+
+.kpi-value { color: var(--tbl-text) !important; }
+
+.kpi-label {
+    font-size: 0.75rem !important;
+    color: var(--tbl-text-muted) !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+}
+
+.feature-card {
+    background: var(--tbl-card-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--tbl-border);
+    border-radius: var(--tbl-radius-lg);
+    padding: 24px;
+    box-shadow: var(--tbl-shadow);
+    transition: all 0.2s ease;
+    margin-bottom: 20px;
+}
+.feature-card:hover {
+    background: var(--tbl-card-bg-hover);
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: var(--tbl-shadow-hover);
+    transform: translateY(-2px);
+}
+.feature-card h3 { margin-top: 0 !important; }
+.feature-card p { color: var(--tbl-text-muted) !important; }
+
+.horizontal-filter-bar {
+    background: var(--tbl-card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--tbl-border);
+    padding: 16px;
+    border-radius: var(--tbl-radius);
+    margin-bottom: 24px;
+    box-shadow: var(--tbl-shadow);
+}
+
+/* Kartu berbasis st.container(key=...) */
+.st-key-scraping_form_card,
+.st-key-social_scraping_form_card,
+.st-key-dashboard_filter_bar,
+.st-key-fenomena_config_card,
+div[class*="st-key-level_card_"] {
+    background: var(--tbl-card-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--tbl-border) !important;
+    border-radius: var(--tbl-radius-lg) !important;
+    padding: 24px !important;
+    box-shadow: var(--tbl-shadow) !important;
+    margin-bottom: 20px !important;
+}
+.st-key-scraping_form_card:hover,
+.st-key-social_scraping_form_card:hover,
+.st-key-dashboard_filter_bar:hover,
+.st-key-fenomena_config_card:hover,
+div[class*="st-key-level_card_"]:hover {
+    border-color: rgba(37, 99, 235, 0.4) !important;
+    background: var(--tbl-card-bg-hover) !important;
+}
+
+.root-cause-badge {
+    display: inline-block;
+    background: var(--tbl-primary-soft);
+    color: var(--tbl-primary) !important;
+    border: 1px solid rgba(32, 107, 196, 0.2);
+    border-radius: var(--tbl-radius-sm);
+    padding: 3px 10px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+}
+
+/* Kartu KPI ikon+nilai+label */
+.metric-card {
+    background: var(--tbl-card-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--tbl-border);
+    border-radius: var(--tbl-radius-lg);
+    padding: 20px 22px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--tbl-shadow);
+    transition: all 0.2s ease;
+    height: 100%;
+}
+.metric-card:hover {
+    transform: translateY(-2px);
+    background: var(--tbl-card-bg-hover);
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: var(--tbl-shadow-hover);
+}
+.metric-icon-badge {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+.metric-icon-blue   { background: rgba(32, 107, 196, 0.15); }
+.metric-icon-amber  { background: rgba(247, 103, 7, 0.15); }
+.metric-icon-coral  { background: rgba(214, 57, 57, 0.15); }
+.metric-icon-purple { background: rgba(103, 76, 218, 0.15); }
+
+.metric-text-value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--tbl-text) !important;
+    line-height: 1.1;
+}
+.metric-text-label {
+    font-size: 0.8rem;
+    color: var(--tbl-text-muted) !important;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+/* Kartu interaktif terpadu */
+.clickable-card {
+    background: var(--tbl-card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--tbl-border);
+    border-radius: var(--tbl-radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--tbl-shadow);
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.clickable-card:hover {
+    transform: translateY(-3px);
+    background: var(--tbl-card-bg-hover);
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: var(--tbl-shadow-hover);
+}
+
+/* =========================================================
+   3. BUTTONS
+   ========================================================= */
+.stButton>button {
+    background: var(--tbl-primary);
+    color: #ffffff;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--tbl-radius-sm);
+    padding: 10px 24px;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+.stButton>button:hover {
+    background: var(--tbl-primary-dark);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+    transform: translateY(-1px);
+}
+.stButton>button:focus:not(:active) {
+    box-shadow: 0 0 0 3px var(--tbl-primary-soft-2) !important;
+}
+
+/* Tombol secondary */
+[data-testid="stBaseButton-secondary"] {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    color: var(--tbl-text) !important;
+    border: 1px solid var(--tbl-border-strong) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+}
+[data-testid="stBaseButton-secondary"]:hover {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    border-color: var(--tbl-primary) !important;
+    color: var(--tbl-primary) !important;
+}
+
+/* =========================================================
+   4. INPUT COMPONENTS (Glass Inputs)
+   ========================================================= */
+input[type="text"], input[type="password"], input[type="number"] {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    color: var(--tbl-text) !important;
+    border: 1px solid var(--tbl-border-strong) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+}
+
+div[data-baseweb="select"],
+div[data-baseweb="select"] > div,
+div[data-baseweb="select"] [class*="control"] {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    border-color: var(--tbl-border-strong) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+}
+
+input[type="text"]:focus, div[data-baseweb="select"]:focus-within {
+    border-color: var(--tbl-primary) !important;
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 0 0 3px var(--tbl-primary-soft-2) !important;
+}
+
+div[data-baseweb="select"] span {
+    color: var(--tbl-text) !important;
+    font-weight: 500 !important;
+}
+
+div[data-baseweb="popover"] ul[role="listbox"],
+div[data-baseweb="menu"] {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--tbl-border) !important;
+    box-shadow: var(--tbl-shadow-hover) !important;
+}
+ul[role="listbox"] li {
+    background-color: transparent !important;
+    color: var(--tbl-text) !important;
+}
+ul[role="listbox"] li:hover {
+    background-color: var(--tbl-primary-soft) !important;
+}
+
+div[data-baseweb="textarea"] textarea, textarea {
+    color: var(--tbl-text) !important;
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-text-fill-color: var(--tbl-text) !important;
+    border: 1px solid var(--tbl-border-strong) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+}
+div[data-baseweb="textarea"] textarea:focus, textarea:focus {
+    border-color: var(--tbl-primary) !important;
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 0 0 3px var(--tbl-primary-soft-2) !important;
+}
+div[data-baseweb="textarea"] label { color: var(--tbl-text) !important; }
+
+::placeholder,
+input::placeholder,
+textarea::placeholder,
+div[data-baseweb="select"] input::placeholder {
+    color: #9aa5b8 !important;
+    opacity: 1 !important;
+    font-weight: 400 !important;
+}
+
+label[data-testid="stWidgetLabel"] span {
+    color: var(--tbl-text) !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+}
+
+/* =========================================================
+   5. TABS
+   ========================================================= */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 4px;
+    background-color: rgba(255, 255, 255, 0.4) !important;
+    backdrop-filter: blur(8px);
+    padding: 5px;
+    border-radius: var(--tbl-radius);
+    border: 1px solid var(--tbl-border) !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: transparent !important;
+    border: none !important;
+    color: var(--tbl-text-muted) !important;
+    border-radius: var(--tbl-radius-sm);
+    font-weight: 600 !important;
+    padding: 8px 16px !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    color: var(--tbl-primary) !important;
+}
+
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    color: var(--tbl-primary) !important;
+    border-color: transparent !important;
+    box-shadow: var(--tbl-shadow);
+}
+
+/* =========================================================
+   6. ALERTS
+   ========================================================= */
+[data-testid="stAlert"] {
+    background-color: rgba(254, 243, 199, 0.7) !important;
+    backdrop-filter: blur(8px) !important;
+    border-left: 4px solid var(--tbl-warning) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+    color: var(--tbl-text) !important;
+}
+[data-testid="stAlert"] p { color: var(--tbl-text) !important; }
+
+/* =========================================================
+   7. DATAFRAME / TABLE / STORY CLUSTERING
+   ========================================================= */
+div[data-testid="stDataFrame"] {
+    background-color: var(--tbl-card-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--tbl-border) !important;
+    border-radius: var(--tbl-radius) !important;
+    padding: 4px !important;
+}
+div[data-testid="stDataFrame"] * {
+    color: var(--tbl-text) !important;
+}
+
+.cluster-card {
+    background-color: var(--tbl-card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--tbl-border);
+    border-radius: var(--tbl-radius);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: var(--tbl-shadow);
+    transition: all 0.2s ease;
+}
+.cluster-card:hover {
+    background-color: var(--tbl-card-bg-hover);
+    border-color: rgba(37, 99, 235, 0.4);
+}
+
+.js-plotly-plot .plotly .g-gtitle text,
+.js-plotly-plot .plotly .xaxislayer-above text,
+.js-plotly-plot .plotly .yaxislayer-above text {
+    fill: var(--tbl-text) !important;
+    font-weight: 500 !important;
+}
+
+/* =========================================================
+   8. SIDEBAR (Frosted Glass Sidebar)
+   ========================================================= */
+[data-testid="stSidebar"] {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border-right: 1px solid var(--tbl-border) !important;
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: var(--tbl-text) !important;
+    text-shadow: none !important;
+}
+
+[data-testid="stSidebar"] *,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] div {
+    color: var(--tbl-text) !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    color: var(--tbl-text-muted) !important;
+}
+
+[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] span {
+    color: var(--tbl-primary) !important;
+    font-weight: 700 !important;
+}
+
+[data-testid="stSidebar"] input[type="text"],
+[data-testid="stSidebar"] input[type="number"],
+[data-testid="stSidebar"] div[data-baseweb="select"] {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    color: var(--tbl-text) !important;
+    border: 1px solid var(--tbl-border-strong) !important;
+}
+
+[data-testid="stSidebarNav"] { display: none !important; }
+
+[data-testid="stSidebar"] [data-testid="stPageLink"] a,
+[data-testid="stSidebar"] a {
+    color: var(--tbl-text-muted) !important;
+    fill: var(--tbl-text-muted) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+    font-weight: 600 !important;
+    transition: all 0.15s ease-in-out !important;
+}
+[data-testid="stSidebar"] [data-testid="stPageLink"] a:hover,
+[data-testid="stSidebar"] a:hover {
+    color: var(--tbl-primary) !important;
+    fill: var(--tbl-primary) !important;
+    background-color: var(--tbl-primary-soft) !important;
+}
+
+/* =========================================================
+   9. SIDEBAR NAVIGATION LINKS
+   ========================================================= */
+[data-testid="stSidebarNavLink"] span,
+[data-testid="stSidebarNavLink"] p {
+    color: var(--tbl-text-muted) !important;
+    font-weight: 600 !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+[data-testid="stSidebarNavLink"]:hover {
+    background-color: var(--tbl-primary-soft) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+}
+[data-testid="stSidebarNavLink"]:hover span,
+[data-testid="stSidebarNavLink"]:hover p {
+    color: var(--tbl-primary) !important;
+}
+
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+    background-color: var(--tbl-primary-soft-2) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+    border-left: 3px solid var(--tbl-primary) !important;
+}
+[data-testid="stSidebarNavLink"][aria-current="page"] span,
+[data-testid="stSidebarNavLink"][aria-current="page"] p {
+    color: var(--tbl-primary) !important;
+    font-weight: 800 !important;
+}
+
+.d-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 4px 18px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--tbl-border);
+}
+.d-brand-logo {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--tbl-primary);
+    border-radius: 9px;
+    font-size: 17px;
+    box-shadow: 0 4px 10px -2px rgba(37, 99, 235, 0.4);
+}
+.d-brand-text { line-height: 1.15; min-width: 0; }
+.d-brand-name {
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    letter-spacing: -0.01em;
+    color: var(--tbl-text) !important;
+}
+.d-brand-tag {
+    font-size: 9.5px !important;
+    letter-spacing: 0.14em;
+    font-weight: 600 !important;
+    color: var(--tbl-text-muted) !important;
+    margin-top: 2px;
+}
+
+.d-nav-label {
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--tbl-text-muted) !important;
+    padding: 4px 10px 8px;
+}
+
+.d-sidebar-footer {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--tbl-border);
+}
+.d-sidebar-footer [data-testid="stCaptionContainer"] p {
+    padding: 0 10px;
+    font-size: 12px !important;
+    line-height: 1.5;
+}
+
+[data-testid="stSidebar"] [data-testid="stPageLink"] {
+    padding: 1px 0 !important;
+}
+[data-testid="stSidebarNavLink"] {
+    padding: 9px 12px !important;
+    border-radius: 8px !important;
+}
+
+.d-status-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 12px 4px 4px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--tbl-border);
+    border-radius: var(--tbl-radius);
+}
+.d-status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: var(--tbl-text) !important;
+}
+.d-status-pill span { color: var(--tbl-text-muted) !important; font-weight: 500 !important; }
+
+/* =========================================================
+   10. ST METRIC (Glass KPI Boxes)
+   ========================================================= */
+[data-testid="stMetric"] {
+    background-color: var(--tbl-card-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--tbl-border) !important;
+    border-radius: var(--tbl-radius-lg) !important;
+    padding: 24px 20px !important;
+    box-shadow: var(--tbl-shadow) !important;
+    height: 100% !important;
+    min-height: 130px;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-2px) !important;
+    background-color: var(--tbl-card-bg-hover) !important;
+    border-color: rgba(37, 99, 235, 0.4) !important;
+    box-shadow: var(--tbl-shadow-hover) !important;
+}
+
+[data-testid="stMetricLabel"] {
+    justify-content: center !important;
+    width: 100% !important;
+    margin-bottom: 8px !important;
+}
+[data-testid="stMetricLabel"] p {
+    color: var(--tbl-text-muted) !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+[data-testid="stMetricValue"] {
+    color: var(--tbl-text) !important;
+    font-size: 2.3rem !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+    width: 100% !important;
+}
+
+[data-testid="stMetric"] [data-testid="stMarkdownContainer"] {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+/* =========================================================
+   11. DIALOG / POP-UP
+   ========================================================= */
+[role="dialog"] {
+    border-radius: var(--tbl-radius-lg) !important;
+    box-shadow: 0 16px 40px rgba(31, 38, 135, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid var(--tbl-border) !important;
+}
+
+[role="dialog"] [data-testid="stMarkdownContainer"] p {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: var(--tbl-text) !important;
+    margin: 0 !important;
+}
+
+[role="dialog"] h3 {
+    font-size: 1.5rem !important;
+    color: var(--tbl-text) !important;
+    line-height: 1.4 !important;
+    margin-bottom: 0.5rem !important;
+}
+
+[role="dialog"] [data-testid="stCaptionContainer"] {
+    background-color: rgba(241, 245, 249, 0.6);
+    padding: 8px 12px;
+    border-radius: var(--tbl-radius-sm);
+    display: inline-block;
+    margin-bottom: 1rem !important;
+}
+[role="dialog"] [data-testid="stCaptionContainer"] p {
+    color: var(--tbl-text-muted) !important;
+    font-size: 0.9rem !important;
+}
+
+[role="dialog"] [data-testid="stMarkdownContainer"] p {
+    font-size: 1.05rem !important;
+    color: #374357 !important;
+    line-height: 1.7 !important;
+    text-align: justify;
+    margin-bottom: 1.2rem !important;
+}
+
+[role="dialog"] [data-testid="stBaseButton-secondary"] {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid var(--tbl-border-strong) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+    transition: all 0.15s;
+}
+[role="dialog"] [data-testid="stBaseButton-secondary"]:hover {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    border-color: var(--tbl-primary) !important;
+}
+
+[role="dialog"] .stVerticalBlock {
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    padding-right: 10px;
+}
+
+/* =========================================================
+   12. SEMANTIC BADGES & UTILITIES
+   ========================================================= */
+.badge-high {
+    background-color: rgba(254, 226, 226, 0.8);
+    color: #991b1b;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+}
+.badge-medium {
+    background-color: rgba(254, 243, 199, 0.8);
+    color: #92400e;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+}
+.badge-low {
+    background-color: rgba(209, 250, 229, 0.8);
+    color: #065f46;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+div[data-testid="stMetric"], div.stCard, .element-container {
+    border-radius: 12px;
+}
+
+.st-emotion-cache-qiev7j.e1bi6yfx1 {
+    color: var(--tbl-text-muted) !important;
+    font-weight: 600 !important;
+}
+
+div.st-key-input_query_tab1 label p {
+    color: var(--tbl-text) !important;
+}
+
+[data-testid="stMarkdownContainer"] > div[style*="background-color"] {
+    border-radius: 10px !important;
+    border: 1px solid var(--tbl-border) !important;
+    padding: 14px 18px !important;
+    margin-bottom: 10px !important;
+    box-shadow: var(--tbl-shadow) !important;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+.block-container {
+    padding-top: 2rem !important;
+    padding-bottom: 2rem !important;
+    max-width: 100% !important;
+}
+
+/* =========================================================
+   FIX: Plotly Legend & Chart Text Visibility
+   ========================================================= */
+.js-plotly-plot .plotly .legendtext {
+    fill: var(--tbl-text) !important;
+    font-weight: 600 !important;
+}
+
+.js-plotly-plot .plotly .infolayer .legend {
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(8px) !important;
+    border: 1px solid var(--tbl-border) !important;
+    border-radius: var(--tbl-radius-sm) !important;
+}
+
+/* =========================================================
+   FIX ULTIMATE: Konsistensi Tinggi Card / Metric Streamlit
+   ========================================================= */
+
+/* 1. Paksa baris horizontal Streamlit agar item di dalamnya mengisi ruang penuh secara vertikal */
+div[data-testid="stHorizontalBlock"] {
+    align-items: stretch !important;
+}
+
+div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+}
+
+div[data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    height: 100% !important;
+}
+
+/* 2. Paksa stMetric agar meregang secara konsisten mengikuti tinggi kolom */
+[data-testid="stMetric"] {
+    background-color: var(--tbl-card-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--tbl-border) !important;
+    border-radius: var(--tbl-radius-lg) !important;
+    padding: 24px 20px !important;
+    box-shadow: var(--tbl-shadow) !important;
+    
+    /* Mengunci ukuran agar rata */
+    flex: 1 !important;
+    height: 100% !important;
+    min-height: 140px !important;
+    
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-2px) !important;
+    background-color: var(--tbl-card-bg-hover) !important;
+    border-color: rgba(37, 99, 235, 0.4) !important;
+    box-shadow: var(--tbl-shadow-hover) !important;
+}
+
+[data-testid="stMetricLabel"] {
+    justify-content: center !important;
+    width: 100% !important;
+    margin-bottom: 8px !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: var(--tbl-text) !important;
+    font-size: 2.3rem !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+    width: 100% !important;
+}

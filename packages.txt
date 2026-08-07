@@ -1,0 +1,8 @@
+fonts-freefont-ttf
+libopenjp2-7
+libtiff6
+libxml2-dev
+libxslt1-dev
+zlib1g-dev
+chromium
+chromium-driver

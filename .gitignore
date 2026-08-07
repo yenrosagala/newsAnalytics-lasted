@@ -1,0 +1,6 @@
+# Python temporary files and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.streamlit/secrets.toml
+D:\New Project\newsAnalytics-lasted\app.log
