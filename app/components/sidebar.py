@@ -21,6 +21,7 @@ import streamlit as st
 
 from app.services.database_service import db_service
 from app.services.ai_service import ai_service
+from app.components.voice_input import render_jarvis_voice_bar
 
 
 def resolve_project_path(path: str) -> str:
@@ -170,6 +171,7 @@ def render_app_sidebar(active_page: str, info_caption: str | None = None) -> Non
                 current_section = section
             st.page_link(resolve_project_path(item["page"]), label=item["label"], icon=item["icon"])
 
+        render_jarvis_voice_bar()
         render_status_bar()
 
         st.markdown('<div class="d-sidebar-footer">', unsafe_allow_html=True)

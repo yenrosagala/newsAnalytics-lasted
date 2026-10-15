@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  #jarvis-mic {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid rgba(56, 189, 248, 0.36);
+    background: rgba(12, 30, 52, 0.55);
+    color: #dff3ff;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.18s ease-in-out;
+  }
+  #jarvis-mic:hover:not(:disabled) {
+    border-color: #22d3ee;
+    box-shadow: 0 0 18px rgba(34, 211, 238, 0.35);
+  }
+  #jarvis-mic.listening {
+    color: #04121f;
+    background: linear-gradient(135deg, #22d3ee, #38bdf8);
+    border-color: rgba(34, 211, 238, 0.6);
+    animation: jv-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes jv-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.5); }
+    50% { box-shadow: 0 0 26px rgba(34, 211, 238, 0.95); }
+  }
+  #jarvis-mic:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  #jarvis-mic .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #22d3ee;
+    flex-shrink: 0;
+  }
+  #jarvis-mic.listening .dot { background: #04121f; }
+  #jarvis-mic .label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+  <button id="jarvis-mic" title="Bicara ke Jarvis">
+    <span class="dot"></span><span class="label">🎙️ Bicara</span>
+  </button>
+<script>
+(function () {
+  var btn = document.getElementById("jarvis-mic");
+  var label = btn.querySelector(".label");
+  var LABEL_DEFAULT = "🎙️ Bicara";
+
+  function sendMsg(type, data) {
+    window.parent.postMessage(
+      Object.assign({ isStreamlitMessage: true, type: type }, data || {}),
+      "*"
+    );
+  }
+  function setFrameHeight(h) { sendMsg("streamlit:setFrameHeight", { height: h }); }
+  function setComponentValue(v) { sendMsg("streamlit:setComponentValue", { value: v, dataType: "json" }); }
+  function syncHeight() { setFrameHeight(Math.ceil(document.body.getBoundingClientRect().height) + 2); }
+
+  // Protocol handshake: Streamlit replies with a render event carrying args.
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    if (!data || data.type !== "streamlit:render") return;
+    var args = data.args || {};
+    LABEL_DEFAULT = args.label || LABEL_DEFAULT;
+    if (!btn.classList.contains("listening")) { label.textContent = LABEL_DEFAULT; }
+    syncHeight();
+  });
+
+  sendMsg("streamlit:componentReady", { apiVersion: 1 });
+  syncHeight();
+  window.addEventListener("resize", syncHeight);
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    btn.disabled = true;
+    label.textContent = "🎙️ Tidak didukung browser";
+    syncHeight();
+    return;
+  }
+
+  var recog = null;
+  var listening = false;
+
+  function resetUI() {
+    listening = false;
+    btn.classList.remove("listening");
+    label.textContent = LABEL_DEFAULT;
+    syncHeight();
+  }
+
+  btn.addEventListener("click", function () {
+    if (listening) {
+      try { recog && recog.stop(); } catch (e) {}
+      return;
+    }
+    recog = new SR();
+    recog.lang = "id-ID";
+    recog.interimResults = true;
+    recog.continuous = false;
+    recog.maxAlternatives = 1;
+
+    listening = true;
+    btn.classList.add("listening");
+    label.textContent = "🎙️ Mendengarkan...";
+    syncHeight();
+
+    recog.onresult = function (event) {
+      var interim = "";
+      var finalText = "";
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var r = event.results[i];
+        if (r.isFinal) { finalText += r[0].transcript; }
+        else { interim += r[0].transcript; }
+      }
+      if (interim) { label.textContent = "🎙️ " + interim.trim(); syncHeight(); }
+      if (finalText.trim()) {
+        setComponentValue({ text: finalText.trim(), id: Date.now(), status: "final" });
+      }
+    };
+    recog.onerror = function (event) {
+      setComponentValue({ text: "", id: Date.now(), status: "error", error: (event && event.error) || "unknown" });
+      resetUI();
+    };
+    recog.onend = resetUI;
+
+    try { recog.start(); } catch (e) { resetUI(); }
+  });
+})();
+</script>
+</body>
+</html>

@@ -98,8 +98,8 @@ def render_social_summary(posts_df: pd.DataFrame) -> None:
         keywords = _top_keywords(posts_df["content"]) if "content" in posts_df.columns else []
         if keywords:
             chips = "".join(
-                f"<span style='display:inline-block; background:rgba(32,107,196,0.08); "
-                f"color:#2563eb; border:1px solid rgba(32,107,196,0.25); border-radius:14px; "
+                f"<span style='display:inline-block; background:rgba(34,211,238,0.10); "
+                f"color:#22d3ee; border:1px solid rgba(34,211,238,0.30); border-radius:14px; "
                 f"padding:3px 12px; margin:3px 4px 3px 0; font-size:0.82rem; font-weight:600;'>"
                 f"{word} · {count}</span>"
                 for word, count in keywords

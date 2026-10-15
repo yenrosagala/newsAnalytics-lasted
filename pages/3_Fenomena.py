@@ -5,8 +5,8 @@ from app.core.logger import setup_logger
 from app.core.page import setup_page
 from app.components.decision_brief_view import render_decision_brief
 from app.components.chatbot import render_topic_chatbot
-from app.services.evidence_graph import build_evidence_graph_fig
-from app.services.actor_graph import build_actor_graph_fig
+from app.services.evidence_graph import build_evidence_graph_fig, build_root_cause_ranking_fig
+from app.services.actor_graph import build_actor_graph_fig, build_actor_ranking_fig
 from app.core.theme import MUTED, TIER_COLORS
 from app import api_bridge
 
@@ -16,7 +16,7 @@ setup_page("AI Investigator", "🕵️", "pages/3_Fenomena.py")
 
 st.markdown("# 🕵️ AI Investigator")
 st.caption("Recursive Root Cause Analysis · Evidence Graph (Terintegrasi API)")
-st.markdown("Telusuri akar masalah secara mendalam berdasarkan temuan berita...[cite: 17]")
+st.markdown("Telusuri akar masalah secara mendalam berdasarkan temuan berita...")
 st.markdown("---")
 
 def _render_level_details(level_info: dict, depth: int, total_levels: int, url_to_global_number: dict | None = None):
@@ -33,10 +33,10 @@ def _render_level_details(level_info: dict, depth: int, total_levels: int, url_t
                 f"di bawah TIDAK LENGKAP, investigasi dihentikan lebih awal karena ini, bukan "
                 f"karena akar masalah sudah ditemukan. Detail: {level_info['ai_call_failed']}"
             )
-        st.markdown(f"<p style='color: #64748b; margin-bottom: 8px;'><b>Artikel Diekstrak:</b> {level_info.get('articles_found', 0)} artikel</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: #8fb4d6; margin-bottom: 8px;'><b>Artikel Diekstrak:</b> {level_info.get('articles_found', 0)} artikel</p>", unsafe_allow_html=True)
 
         if level_info.get("summary"):
-            st.markdown(f"<p style='color: #374357;'><b>📝 Ringkasan Level:</b> {level_info['summary']}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color: #cbe6f7;'><b>📝 Ringkasan Level:</b> {level_info['summary']}</p>", unsafe_allow_html=True)
 
         if level_info.get("causes_extracted"):
             st.markdown("<b>🔍 Penyebab Teridentifikasi (dengan Skor Keyakinan):</b>", unsafe_allow_html=True)
@@ -50,7 +50,7 @@ def _render_level_details(level_info: dict, depth: int, total_levels: int, url_t
                     badge = f"<span style='background:{color}22; color:{color}; border:1px solid {color}66; border-radius:6px; padding:1px 8px; font-size:0.72rem; font-weight:700; margin-left:6px;'>{composite}% · {tier}</span>" if composite is not None else ""
                     st.markdown(f"- {c.get('cause', '')} {badge}", unsafe_allow_html=True)
                     if c.get("rationale"):
-                        st.markdown(f"<p style='color:#64748b; font-size:0.82rem; margin:0 0 6px 16px;'>↳ {c['rationale']}</p>", unsafe_allow_html=True)
+                        st.markdown(f"<p style='color:#8fb4d6; font-size:0.82rem; margin:0 0 6px 16px;'>↳ {c['rationale']}</p>", unsafe_allow_html=True)
                 else:
                     st.markdown(f"- 🔴 {c}")
 
@@ -66,7 +66,10 @@ def _render_level_details(level_info: dict, depth: int, total_levels: int, url_t
             st.info(" | ".join([f"`{kw}`" for kw in level_info["next_keywords"]]))
 
 def _render_evidence_graph_section(result_tree: list, graph_data: dict):
-    st.caption("Peta bukti interaktif[cite: 17]")
+    st.caption("Peta bukti interaktif")
+    ranking = build_root_cause_ranking_fig(graph_data)
+    if ranking is not None:
+        st.plotly_chart(ranking, use_container_width=True)
     fig = build_evidence_graph_fig(graph_data)
     if fig is not None:
         st.plotly_chart(fig, use_container_width=True)
@@ -86,11 +89,14 @@ def _build_and_cache_actor_graph(query_key: str, result_tree: list):
         st.session_state["last_actor_graph_error"] = None
 
 def _render_actor_graph_section(query_key: str, result_tree: list):
-    st.caption("Orang & institusi yang disebut terlibat di tiap level investigasi, dan bagaimana mereka menjembatani level yang berbeda. Diekstrak dari ringkasan & penyebab yang sudah ada -- tidak fetch ulang artikel.[cite: 17]")
+    st.caption("Orang & institusi yang disebut terlibat di tiap level investigasi, dan bagaimana mereka menjembatani level yang berbeda. Diekstrak dari ringkasan & penyebab yang sudah ada -- tidak fetch ulang artikel.")
     cached_key = st.session_state.get("last_actor_graph_key")
     cached_data = st.session_state.get("last_actor_graph_data")
 
     if cached_key == query_key and cached_data:
+        ranking = build_actor_ranking_fig(cached_data)
+        if ranking is not None:
+            st.plotly_chart(ranking, use_container_width=True)
         fig = build_actor_graph_fig(cached_data)
         if fig is not None:
             st.plotly_chart(fig, use_container_width=True)
@@ -160,7 +166,11 @@ tab_recursive, tab_pdf_recursive = st.tabs(["🕵️ Jalankan AI Investigator", 
 with tab_recursive:
     with st.container(key="fenomena_config_card"):
         st.subheader("⚙️ Konfigurasi Investigasi")
-        initial_problem_query = st.text_area("Deskripsi Fenomena / Masalah Utama", value=st.session_state.get("last_recursive_query", "Sensus Ekonomi 2026 Papua kendala"))
+        initial_problem_query = st.text_area(
+            "Deskripsi Fenomena / Masalah Utama",
+            value=st.session_state.get("investigator_prefill")
+            or st.session_state.get("last_recursive_query", "Sensus Ekonomi 2026 Papua kendala"),
+        )
         depth = st.slider("Kedalaman Analisis (Recursive Level)", 3, 7, 5)
         save_investigation_to_db = st.checkbox(
             "💾 Simpan Hasil Investigasi ke Database",
@@ -172,6 +182,7 @@ with tab_recursive:
     st.markdown("---")
 
     if run_analysis:
+        st.session_state.pop("investigator_prefill", None)
         with st.status("🕵️ AI Investigator Server sedang bekerja...", expanded=True) as status_box:
             try:
                 import asyncio
@@ -210,10 +221,10 @@ with tab_recursive:
         stored_result_history = st.session_state.get("last_recursive_result", None)
         if not stored_result_history:
             st.markdown(
-                """<div class="feature-card" style="text-align: center; padding: 48px 24px; border: 2px dashed rgba(32, 107, 196, 0.25);">
+                """<div class="feature-card" style="text-align: center; padding: 48px 24px; border: 2px dashed rgba(34, 211, 238, 0.28);">
                 <div style="font-size: 3rem; margin-bottom: 12px;">🕵️</div>
-                <h3 style="color: #2563eb;">Belum Ada Investigasi yang Dijalankan</h3>
-                <p style="color: #64748b; max-width: 600px; margin: 0 auto 20px auto;">
+                <h3 style="color: #22d3ee;">Belum Ada Investigasi yang Dijalankan</h3>
+                <p style="color: #8fb4d6; max-width: 600px; margin: 0 auto 20px auto;">
                     Masukkan deskripsi fenomena di atas dan klik tombol <b>Jalankan AI Investigator</b>. 
                 </p></div>""", unsafe_allow_html=True
             )
@@ -236,7 +247,7 @@ with tab_pdf_recursive:
     if not stored_result:
         st.warning("⚠️ Belum ada hasil investigasi yang tersedia.")
     else:
-        st.info(f"💡 Executive Intelligence Brief **'{stored_title}'** siap dicetak[cite: 17].")
+        st.info(f"💡 Executive Intelligence Brief **'{stored_title}'** siap dicetak.")
         stored_brief = st.session_state.get("last_decision_brief", {})
         cached_actor_key = st.session_state.get("last_actor_graph_key")
         cached_actor_data = st.session_state.get("last_actor_graph_data")

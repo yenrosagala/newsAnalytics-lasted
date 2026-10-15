@@ -17,6 +17,8 @@ Each function below mirrors one FastAPI route 1:1.
 import json
 from typing import Optional
 
+import streamlit as st
+
 from app.core.logger import get_logger
 from app.services.database_service import db_service, DatabaseConnectionError
 from app.services.scraper_service import scraper_service
@@ -140,6 +142,7 @@ def _stored_summary_to_dict(row: dict) -> dict:
     return parsed
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_saved_summaries(limit: int = 200) -> list:
     """Daftar Ringkasan Berita yang tersimpan di tabel executive_summaries
     (terbaru dulu), sudah diparse jadi dict siap tampil:
@@ -165,6 +168,7 @@ def get_dashboard_metrics(keyword: Optional[str] = None, media: Optional[str] = 
     }
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_articles(limit: int = 100) -> list:
     df = db_service.get_latest_scraped_data(limit=limit)
     return df.to_dict(orient="records")
@@ -234,6 +238,7 @@ async def run_investigation(
 
 # ---- predictive.py -----------------------------------------------------------
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_predictive_analysis(keyword: str, forecast_horizon: int = 7) -> dict:
     df = db_service.get_latest_scraped_data(limit=1000)
     if df.empty:
@@ -309,13 +314,20 @@ def _load_social_posts_for_keyword(keyword: str) -> tuple[Optional[list[dict]], 
     return df_kw.to_dict(orient="records"), None
 
 
-def generate_social_summary(keyword: str) -> tuple[Optional[dict], list[dict], Optional[str]]:
+def generate_social_summary(
+    keyword: str, posts: Optional[list[dict]] = None
+) -> tuple[Optional[dict], list[dict], Optional[str]]:
     """Returns (summary, posts, error). Membuat Ringkasan Berita naratif dari
-    post media sosial yang tersimpan untuk suatu keyword, TANPA merender PDF --
-    dipakai untuk menampilkan ringkasan langsung di halaman."""
-    posts, err = _load_social_posts_for_keyword(keyword)
-    if err:
-        return None, [], err
+    post media sosial untuk suatu keyword, TANPA merender PDF -- dipakai untuk
+    menampilkan ringkasan langsung di halaman.
+
+    `posts`: kirim post yang BARU di-scrape (dari execute_social_scraping)
+    supaya ringkasan tidak bergantung pada tabel DB `social_posts`. Kalau
+    tidak diisi, post diambil ulang dari DB (butuh tabel social_posts ada)."""
+    if not posts:
+        posts, err = _load_social_posts_for_keyword(keyword)
+        if err:
+            return None, [], err
     try:
         summary = news_summary_service.generate_summary(keyword, posts)
         return summary, posts, None

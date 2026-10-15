@@ -14,7 +14,7 @@ setup_page("Predictive Intelligence", "🔮", "pages/4_Predictive_Intelligence.p
 
 st.markdown("# 🔮 Predictive Intelligence")
 st.caption("Trend Detection · Forecasting · Anomaly Detection (Terintegrasi API)")
-st.markdown("Analisis pola volume & sentimen berita dari waktu ke waktu...[cite: 18]")
+st.markdown("Analisis pola volume & sentimen berita dari waktu ke waktu...")
 st.markdown("---")
 
 _DARK_LAYOUT = {**CHART_LAYOUT, "margin": dict(t=30, b=10, l=10, r=10)}
@@ -38,6 +38,8 @@ if not available_keywords:
         st.error(f"⚠️ Gagal memuat data dari database — ini BUKAN 'tidak ada keyword', koneksi/query-nya gagal: {keywords_error}")
     else:
         st.warning("Belum ada data berita tersimpan untuk dianalisis. Jalankan scraping terlebih dahulu.")
+    if st.button("📥 Jalankan News Scraper", type="primary", width='stretch', key="predictive_ke_scraper"):
+        st.switch_page("pages/1_Scraping.py")
     st.stop()
 
 col_select, col_config = st.columns([2, 1])
@@ -96,7 +98,7 @@ with tab_trend:
 
 # ==================== TAB 3: FORECASTING ====================
 with tab_forecast:
-    st.markdown(f"### 🔮 Proyeksi {forecast_horizon} Hari ke Depan[cite: 18]")
+    st.markdown(f"### 🔮 Proyeksi {forecast_horizon} Hari ke Depan")
     if not forecast:
         st.info("Data historis terlalu sedikit untuk membuat proyeksi yang bermakna (minimal ~5 hari data).")
     else:
@@ -115,7 +117,7 @@ with tab_forecast:
 
         slope = forecast["slope_per_day"]
         direction_word = "naik" if slope > 0.1 else "turun" if slope < -0.1 else "relatif stabil"
-        st.caption(f"⚠️ **Catatan metodologi**: Proyeksi ini memakai regresi linear...[cite: 18]")
+        st.caption("⚠️ **Catatan metodologi**: proyeksi memakai regresi linear sederhana -- indikasi arah, bukan kepastian.")
 
 # ==================== TAB 4: ANOMALY DETECTION ====================
 with tab_anomaly:

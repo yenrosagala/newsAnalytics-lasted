@@ -1,0 +1,14 @@
+# JARVIS HUD theme -- dark command-center base.
+# Streamlit-native tokens (fix the widget chrome CSS can't reach cleanly);
+# app/assets/style.css layers the glass panels, cyan glow and grid on top.
+
+[theme]
+base = "dark"
+primaryColor = "#22d3ee"
+backgroundColor = "#050a12"
+secondaryBackgroundColor = "#0a1626"
+textColor = "#dff3ff"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

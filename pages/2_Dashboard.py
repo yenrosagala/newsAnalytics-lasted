@@ -11,7 +11,7 @@ from app.core.page import setup_page
 
 logger = setup_logger("page_dashboard")
 
-setup_page("Analytics", "📊", "pages/2_Dashboard.py")
+setup_page("Analytics Dashboard", "📊", "pages/2_Dashboard.py")
 
 st.markdown("# 📊 Analytics Dashboard")
 st.caption("Dashboard and Admin Management (Terintegrasi API)")
@@ -45,6 +45,8 @@ if df_raw.empty:
         st.error(f"⚠️ Gagal memuat data dari database — ini BUKAN 'belum ada data', koneksi/query-nya gagal: {load_error}")
     else:
         st.info("Basis data terhubung dengan baik, tapi belum ada artikel yang tersimpan. Jalankan scraping terlebih dahulu.")
+    if st.button("📥 Jalankan News Scraper", type="primary", width='stretch', key="dashboard_ke_scraper"):
+        st.switch_page("pages/1_Scraping.py")
     st.stop()
 
 col_keyword = "kata_kunci" if "kata_kunci" in df_raw.columns else "keyword"
@@ -58,7 +60,7 @@ with st.expander("⚙️ Control Panel Data (Filter Global)", expanded=True):
     f_col1, f_col2, f_col3 = st.columns(3)
     with f_col1:
         available_options = list(df_raw[col_keyword].dropna().unique()) if col_keyword in df_raw.columns else []
-        selected_keyword = st.multiselect("Filter Keyword", options=available_options, default=None)
+        selected_keyword = st.multiselect("Filter Keyword", options=available_options, default=None, key="dashboard_keyword_filter")
     with f_col2:
         opsi_sentimen = list(df_raw[col_sentiment].dropna().unique()) if col_sentiment else ["POSITIVE", "NEGATIVE", "NEUTRAL"]
         selected_sentimen = st.multiselect("Filter Sentimen", options=opsi_sentimen, default=opsi_sentimen)
@@ -74,7 +76,7 @@ if selected_media:
 if col_sentiment and selected_sentimen:
     filtered_df = filtered_df[filtered_df[col_sentiment].isin(selected_sentimen)]
 
-st.caption(f"📋 {len(filtered_df):,} dari {len(df_raw):,} artikel cocok dengan filter saat ini[cite: 16].")
+st.caption(f"📋 {len(filtered_df):,} dari {len(df_raw):,} artikel cocok dengan filter saat ini.")
 
 tab_labels = ["📊 Overview", "🗺️ Spatial Intelligence", "📋 Data Berita"]
 if is_admin:
@@ -177,12 +179,12 @@ with tab_spatial:
             fig_map.update_geos(
                 center=dict(lat=-2.5, lon=118),
                 projection_scale=4.2,
-                showcountries=True, countrycolor="#c7ccd6",
-                showland=True, landcolor="#e9edf3",
-                showocean=True, oceancolor="#f6f8fb",
+                showcountries=True, countrycolor="#2b4a6f",
+                showland=True, landcolor="#0e2038",
+                showocean=True, oceancolor="#061020",
                 bgcolor="rgba(0,0,0,0)",
             )
-            fig_map.update_layout(**CHART_LAYOUT, margin=dict(t=40, b=10, l=10, r=10), height=520)
+            fig_map.update_layout(**{**CHART_LAYOUT, "margin": dict(t=40, b=10, l=10, r=10), "height": 520})
             st.plotly_chart(fig_map, width='stretch')
 
             st.markdown("#### 🏆 Ranking Hotspot")
@@ -220,7 +222,7 @@ with tab_data:
 # ==================== TAB 3: ADMIN ====================
 if is_admin:
     with tab_admin:
-        st.warning("⚠️ Tindakan di tab ini bersifat permanen dan tidak dapat dibatalkan[cite: 16].")
+        st.warning("⚠️ Tindakan di tab ini bersifat permanen dan tidak dapat dibatalkan.")
         target_date = st.date_input("Pilih Tanggal Target Penghapusan", key="date_hapus_massal")
         admin_password = st.text_input("PostgreSQL Admin Password", type="password", key="pg_admin_password")
 

@@ -4,7 +4,7 @@
    backdrop-blur, subtle borders, and glowing shadows.
    ========================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700;900&display=swap');
 
 :root {
     --tbl-primary: #2563eb;
@@ -849,4 +849,212 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {
     font-weight: 800 !important;
     text-align: center !important;
     width: 100% !important;
+}
+
+/* =========================================================
+   13. JARVIS HUD OVERRIDE LAYER
+   Redefine the :root tokens (later declaration wins) + re-skin the
+   handful of rules above that hardcoded white glass / blue accents.
+   Visual language: cyan glow on deep navy-black, faint HUD grid,
+   Orbitron display type.
+   ========================================================= */
+:root {
+    --tbl-primary: #22d3ee;
+    --tbl-primary-dark: #06b6d4;
+    --tbl-primary-soft: rgba(34, 211, 238, 0.12);
+    --tbl-primary-soft-2: rgba(34, 211, 238, 0.24);
+    --tbl-accent-2: #38bdf8;
+
+    --tbl-body-bg: radial-gradient(1100px 720px at 12% -8%, #0d2440 0%, #061020 42%, #03060c 100%);
+    --tbl-card-bg: rgba(10, 24, 43, 0.62);
+    --tbl-card-bg-hover: rgba(15, 34, 58, 0.82);
+    --tbl-border: rgba(56, 189, 248, 0.20);
+    --tbl-border-strong: rgba(56, 189, 248, 0.36);
+
+    --tbl-text: #dff3ff;
+    --tbl-text-muted: #7fa8c9;
+
+    --tbl-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.38);
+    --tbl-shadow-hover: 0 12px 40px 0 rgba(0, 0, 0, 0.5), 0 0 22px rgba(34, 211, 238, 0.16);
+    --tbl-glow: 0 0 20px rgba(34, 211, 238, 0.35);
+
+    --tbl-success: #34d399;
+    --tbl-warning: #fbbf24;
+    --tbl-danger: #f87171;
+    --tbl-font-display: 'Orbitron', 'Inter', system-ui, sans-serif;
+}
+
+/* Faint HUD grid behind the whole app (static -- no motion to reduce) */
+.stApp {
+    background-image:
+        linear-gradient(rgba(56, 189, 248, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.045) 1px, transparent 1px),
+        radial-gradient(1100px 720px at 12% -8%, #0d2440 0%, #061020 42%, #03060c 100%) !important;
+    background-size: 46px 46px, 46px 46px, cover !important;
+    background-attachment: fixed !important;
+}
+
+/* Display type for headings, brand, nav labels and metric read-outs */
+h1, h2, h3, h4, h5, h6,
+.d-brand-name, .d-nav-label, .kpi-value, .metric-text-value,
+[data-testid="stMetricValue"] {
+    font-family: var(--tbl-font-display) !important;
+    letter-spacing: 0.02em !important;
+}
+h1, h2, h3 { text-shadow: 0 0 20px rgba(34, 211, 238, 0.28) !important; }
+
+/* Primary buttons: dark glyphs on a glowing cyan gradient */
+.stButton>button {
+    color: #04121f !important;
+    background: linear-gradient(135deg, var(--tbl-primary), var(--tbl-accent-2)) !important;
+    border: 1px solid rgba(34, 211, 238, 0.5) !important;
+    box-shadow: 0 4px 14px rgba(34, 211, 238, 0.28) !important;
+}
+.stButton>button:hover {
+    background: linear-gradient(135deg, var(--tbl-accent-2), var(--tbl-primary)) !important;
+    box-shadow: var(--tbl-glow) !important;
+}
+
+[data-testid="stBaseButton-secondary"] {
+    background-color: rgba(12, 30, 52, 0.5) !important;
+    color: var(--tbl-text) !important;
+    border-color: var(--tbl-border-strong) !important;
+}
+[data-testid="stBaseButton-secondary"]:hover {
+    background-color: rgba(16, 40, 66, 0.85) !important;
+    border-color: var(--tbl-primary) !important;
+    color: var(--tbl-primary) !important;
+}
+
+/* Inputs / selects / textareas on dark glass */
+input[type="text"], input[type="password"], input[type="number"],
+div[data-baseweb="select"], div[data-baseweb="select"] > div,
+div[data-baseweb="select"] [class*="control"],
+div[data-baseweb="textarea"] textarea, textarea,
+[data-testid="stSidebar"] input[type="text"],
+[data-testid="stSidebar"] input[type="number"],
+[data-testid="stSidebar"] div[data-baseweb="select"] {
+    background-color: rgba(12, 30, 52, 0.5) !important;
+    color: var(--tbl-text) !important;
+    -webkit-text-fill-color: var(--tbl-text) !important;
+    border-color: var(--tbl-border-strong) !important;
+}
+input[type="text"]:focus, textarea:focus,
+div[data-baseweb="select"]:focus-within,
+div[data-baseweb="textarea"] textarea:focus {
+    background-color: rgba(16, 40, 66, 0.85) !important;
+    border-color: var(--tbl-primary) !important;
+    box-shadow: 0 0 0 3px var(--tbl-primary-soft-2) !important;
+}
+::placeholder, input::placeholder, textarea::placeholder { color: #6e93b3 !important; }
+
+div[data-baseweb="popover"] ul[role="listbox"], div[data-baseweb="menu"] {
+    background-color: rgba(8, 18, 32, 0.97) !important;
+    border: 1px solid var(--tbl-border) !important;
+}
+ul[role="listbox"] li:hover { background-color: var(--tbl-primary-soft) !important; }
+
+.stTabs [data-baseweb="tab-list"] { background-color: rgba(12, 30, 52, 0.4) !important; }
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    background-color: rgba(16, 40, 66, 0.9) !important;
+    color: var(--tbl-primary) !important;
+    box-shadow: 0 0 14px rgba(34, 211, 238, 0.18) !important;
+}
+
+[data-testid="stAlert"] {
+    background-color: rgba(251, 191, 36, 0.10) !important;
+    border-left: 4px solid var(--tbl-warning) !important;
+}
+
+[role="dialog"] { background-color: rgba(8, 18, 32, 0.94) !important; }
+[role="dialog"] [data-testid="stMarkdownContainer"] p { color: #cbe6f7 !important; }
+[role="dialog"] [data-testid="stCaptionContainer"] { background-color: rgba(12, 30, 52, 0.6) !important; }
+[role="dialog"] [data-testid="stBaseButton-secondary"] { background-color: rgba(12, 30, 52, 0.6) !important; }
+[role="dialog"] [data-testid="stBaseButton-secondary"]:hover { background-color: rgba(16, 40, 66, 0.9) !important; }
+
+.d-status-bar, .horizontal-filter-bar,
+[data-testid="stMarkdownContainer"] > div[style*="background-color"] {
+    background: rgba(12, 30, 52, 0.45) !important;
+}
+.js-plotly-plot .plotly .infolayer .legend { background: rgba(8, 18, 32, 0.78) !important; }
+
+/* Brand mark: glowing cyan reactor */
+.d-brand-logo {
+    background: linear-gradient(135deg, var(--tbl-primary), var(--tbl-accent-2)) !important;
+    color: #04121f !important;
+    box-shadow: var(--tbl-glow) !important;
+}
+
+/* Semantic badges re-tuned for dark surfaces */
+.badge-high { background-color: rgba(248, 113, 113, 0.15) !important; color: #fca5a5 !important; }
+.badge-medium { background-color: rgba(251, 191, 36, 0.15) !important; color: #fcd34d !important; }
+.badge-low { background-color: rgba(52, 211, 153, 0.15) !important; color: #6ee7b7 !important; }
+
+/* =========================================================
+   14. JARVIS MOTION -- pure-CSS arc reactor
+   Cincin konsentris + inti berdenyut, semuanya CSS
+   (tanpa JS/gambar), jadi animasi berjalan di browser dan TIDAK
+   menambah RAM server sama sekali. Markup: lihat streamlit_app.py.
+   ========================================================= */
+@keyframes jr-spin { to { transform: rotate(360deg); } }
+@keyframes jr-spin-rev { to { transform: rotate(-360deg); } }
+@keyframes jr-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 18px 2px rgba(34, 211, 238, 0.55),
+                    inset 0 0 12px rgba(56, 189, 248, 0.65);
+    }
+    50% {
+        transform: scale(1.08);
+        box-shadow: 0 0 34px 9px rgba(34, 211, 238, 0.78),
+                    inset 0 0 22px rgba(56, 189, 248, 0.95);
+    }
+}
+@keyframes jr-brand-pulse {
+    0%, 100% { box-shadow: 0 0 14px rgba(34, 211, 238, 0.45); }
+    50% { box-shadow: 0 0 26px rgba(34, 211, 238, 0.90); }
+}
+
+.jarvis-reactor {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    margin: 4px auto 22px;
+}
+.jarvis-reactor > * { position: absolute; border-radius: 50%; }
+
+.jr-ring--outer {
+    inset: 0;
+    border: 2px dashed rgba(34, 211, 238, 0.45);
+    animation: jr-spin 22s linear infinite;
+}
+.jr-ring--mid {
+    inset: 18%;
+    border: 2px solid rgba(56, 189, 248, 0.30);
+    border-top-color: rgba(34, 211, 238, 0.90);
+    border-right-color: rgba(34, 211, 238, 0.60);
+    box-shadow: 0 0 18px rgba(34, 211, 238, 0.22);
+    animation: jr-spin-rev 13s linear infinite;
+}
+.jr-ring--inner {
+    inset: 34%;
+    border: 2px dashed rgba(34, 211, 238, 0.55);
+    animation: jr-spin 9s linear infinite;
+}
+.jr-core {
+    inset: 0;
+    margin: auto;
+    width: 34%;
+    height: 34%;
+    background: radial-gradient(circle at 50% 45%,
+        #eafcff 0%, var(--tbl-accent-2) 34%, #0a6e8c 72%, #04222e 100%);
+    animation: jr-pulse 2.6s ease-in-out infinite;
+}
+
+/* Brand mark berdenyut selaras -- tampil di sidebar SEMUA halaman */
+.d-brand-logo { animation: jr-brand-pulse 3.4s ease-in-out infinite; }
+
+/* Aksesibilitas: hormati pengguna yang meminta gerakan minimal */
+@media (prefers-reduced-motion: reduce) {
+    .jarvis-reactor *, .d-brand-logo { animation: none !important; }
 }

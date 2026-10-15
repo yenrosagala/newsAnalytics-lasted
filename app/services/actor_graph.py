@@ -20,7 +20,7 @@ import re
 from typing import Dict, List
 
 from app.core.logger import get_logger
-from app.core.theme import CHART_LAYOUT
+from app.core.theme import CHART_LAYOUT, MUTED
 from app.services.ai_service import ai_service
 
 logger = get_logger("ActorGraph")
@@ -230,32 +230,37 @@ def build_actor_graph_fig(graph_data: Dict):
         positions[n["id"]] = (base_x, y)
 
     entity_by_id = {n["id"]: n for n in entity_nodes}
-    edge_x_normal, edge_y_normal = [], []
-    edge_x_bridge, edge_y_bridge = [], []
+    edge_normal = [[], []]
+    edge_b2 = [[], []]
+    edge_b3 = [[], []]
     for e in edges:
         if e["source"] not in positions or e["target"] not in positions:
             continue
         x0, y0 = positions[e["source"]]
         x1, y1 = positions[e["target"]]
         entity = entity_by_id.get(e["source"])
-        is_bridge = entity is not None and len(entity.get("depths", [])) > 1
-        if is_bridge:
-            edge_x_bridge += [x0, x1, None]
-            edge_y_bridge += [y0, y1, None]
-        else:
-            edge_x_normal += [x0, x1, None]
-            edge_y_normal += [y0, y1, None]
+        ndepths = len(entity.get("depths", [])) if entity else 1
+        # Ketebalan garis = berapa banyak level yang dijembatani aktor itu, jadi
+        # aktor penghubung terbanyak paling menonjol secara visual.
+        bucket = edge_normal if ndepths <= 1 else (edge_b2 if ndepths == 2 else edge_b3)
+        bucket[0] += [x0, x1, None]
+        bucket[1] += [y0, y1, None]
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=edge_x_normal, y=edge_y_normal, mode="lines",
+        x=edge_normal[0], y=edge_normal[1], mode="lines",
         line=dict(color="rgba(148,163,184,0.45)", width=1.2),
         hoverinfo="none", showlegend=False,
     ))
     fig.add_trace(go.Scatter(
-        x=edge_x_bridge, y=edge_y_bridge, mode="lines",
-        line=dict(color="rgba(239,68,68,0.55)", width=2.0),
-        hoverinfo="none", showlegend=bool(edge_x_bridge), name="Aktor Lintas Level (Jembatan)",
+        x=edge_b2[0], y=edge_b2[1], mode="lines",
+        line=dict(color="rgba(239,68,68,0.50)", width=1.8),
+        hoverinfo="none", showlegend=bool(edge_b2[0]), name="Jembatan 2 level",
+    ))
+    fig.add_trace(go.Scatter(
+        x=edge_b3[0], y=edge_b3[1], mode="lines",
+        line=dict(color="rgba(239,68,68,0.72)", width=2.8),
+        hoverinfo="none", showlegend=bool(edge_b3[0]), name="Jembatan ≥3 level",
     ))
 
     lx, ly, ltext, lhover = [], [], [], []
@@ -278,9 +283,16 @@ def build_actor_graph_fig(graph_data: Dict):
                 continue
             x, y = positions[n["id"]]
             ex.append(x); ey.append(y)
-            etext.append(_truncate(n["label"]))
             depths = sorted(set(n.get("depths") or []))
             roles = n.get("roles") or {}
+            label_txt = _truncate(n["label"], 20)
+            if len(depths) > 1:
+                # Aktor jembatan: tampilkan perannya langsung di node (level
+                # kemunculan pertama), bukan hanya di hover.
+                role_short = _truncate(roles.get(depths[0], "") or "", 26)
+                badge = role_short or f"↔ {len(depths)} level"
+                label_txt = f"{label_txt}<br>{badge}"
+            etext.append(label_txt)
             role_lines = "<br>".join(f"Level {d}: {roles.get(d, '-') or '-'}" for d in depths)
             ehover.append(f"<b>{n['label']}</b><br>Muncul di Level: {', '.join(map(str, depths))}<br>{role_lines}")
             esize.append(min(20 + 6 * len(depths), 46))
@@ -300,6 +312,43 @@ def build_actor_graph_fig(graph_data: Dict):
         yaxis=dict(visible=False),
         height=max(460, 260 * (max((n["depth"] for n in level_nodes), default=1) + 1)),
         hovermode="closest",
+        **CHART_LAYOUT,
+    )
+    return fig
+
+
+def build_actor_ranking_fig(graph_data: Dict, top_n: int = 12):
+    """Bar chart peringkat aktor menurut keluasan = jumlah level investigasi yang
+    dihubungkannya (diwarnai per tipe). Menjawab "siapa paling sentral" dalam
+    satu pandangan -- pola yang sulit dibaca dari diagram node-link. None kalau
+    tidak ada aktor."""
+    import plotly.graph_objects as go
+
+    entities = [n for n in (graph_data.get("nodes") or []) if n.get("type") != "level"]
+    if not entities:
+        return None
+    ranked = sorted(entities, key=lambda n: -len(n.get("depths") or []))[:top_n]
+    ranked.reverse()  # skor tertinggi muncul paling atas pada bar horizontal
+
+    labels = [_truncate(n["label"], 40) for n in ranked]
+    values = [len(n.get("depths") or []) for n in ranked]
+    colors = [_TYPE_COLORS.get(n.get("type"), MUTED) for n in ranked]
+
+    fig = go.Figure(go.Bar(
+        x=values, y=labels, orientation="h",
+        marker=dict(color=colors),
+        text=[f"{v} level" for v in values], textposition="outside",
+        hovertext=[
+            f"{'Orang' if n.get('type') == 'orang' else 'Institusi'} · Level {', '.join(map(str, sorted(set(n.get('depths') or []))))}"
+            for n in ranked
+        ],
+        hoverinfo="text+x",
+    ))
+    fig.update_layout(
+        title="Peringkat Aktor menurut Keluasan (Level yang Dihubungkan)",
+        xaxis=dict(title="Jumlah level investigasi", dtick=1, range=[0, max(values) + 1]),
+        yaxis=dict(title=""),
+        height=max(280, 34 * len(values) + 96),
         **CHART_LAYOUT,
     )
     return fig

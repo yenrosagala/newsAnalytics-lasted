@@ -29,11 +29,13 @@ di luar; sitasi [n] di jawaban AI di-linkify otomatis ke URL sumber aslinya;
 dan panel "Lihat Sumber" ditambahkan supaya pengguna bisa memverifikasi basis
 pengetahuan tanpa harus bertanya ke AI.
 """
+import json
 import re
 from typing import Dict, List, Optional
 
 import streamlit as st
 
+from app.components.voice_input import render_voice_input
 from app.core.logger import get_logger
 from app.services.ai_service import ai_service
 
@@ -108,6 +110,55 @@ def _linkify_citations(text: str, citation_map: Dict[int, str]) -> str:
     return _CITATION_RE.sub(_replace, text)
 
 
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_MD_JUNK_RE = re.compile(r"[*_`#>]+")
+
+
+def _plain_text_for_speech(text: str, limit: int = 1500) -> str:
+    """Jadikan jawaban AI (markdown) menjadi teks bersih yang enak dibacakan:
+    link -> label, sitasi [n] dibuang, penanda **/_/`/# dibuang."""
+    if not text:
+        return ""
+    cleaned = _MD_LINK_RE.sub(r"\1", text)
+    cleaned = _CITATION_RE.sub("", cleaned)
+    cleaned = _MD_JUNK_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:limit]
+
+
+def _speak_component(text: str) -> None:
+    """Text-to-speech memakai Web Speech API bawaan browser -- tanpa dependency
+    server maupun API key, dan suaranya memakai voice bawaan OS pengguna.
+    Dirender lewat st.html(unsafe_allow_javascript=True) supaya skripnya jalan
+    LANGSUNG di dokumen utama app (bukan iframe) -- utterance jadi tidak
+    terputus saat Streamlit rerun. Hanya dipanggil saat ada jawaban baru."""
+    text_json = json.dumps(text, ensure_ascii=False)
+    st.html(
+        f"""
+        <script>
+        (function() {{
+            var text = {text_json};
+            if (!text || !('speechSynthesis' in window)) return;
+            try {{
+                window.speechSynthesis.cancel();
+                var u = new SpeechSynthesisUtterance(text);
+                u.lang = 'id-ID';
+                u.rate = 1.0;
+                window.speechSynthesis.speak(u);
+            }} catch (e) {{ console.warn('TTS gagal:', e); }}
+        }})();
+        </script>
+        """,
+        unsafe_allow_javascript=True,
+    )
+
+
+def speak_text(text: str) -> None:
+    """Alias publik _speak_component supaya modul lain (perintah suara,
+    konfirmasi navigasi) bisa membacakan teks tanpa mengimpor nama privat."""
+    _speak_component(text)
+
+
 def _build_system_prompt(topic_label: str) -> str:
     """Instruksi TETAP untuk chatbot topik ini -- tidak berubah antar-giliran
     chat, dikirim sebagai pesan role "system". Dipisah dari sumber/riwayat/
@@ -166,6 +217,22 @@ def _generate_answer(topic_label: str, scoped: List[Dict], history_before: List[
         return f"⚠️ Gagal mendapatkan jawaban dari AI: {e}"
 
 
+def _consume_voice_question(session_key: str) -> Optional[str]:
+    """Tombol mikrofon di atas kotak chat: hasil pengenalan suara terbaru
+    dikembalikan SEKALI sebagai pertanyaan (di-dedupe per `id` supaya tidak
+    terulang tiap rerun), lalu diproses lewat pipeline chat yang sama dengan
+    pertanyaan yang diketik."""
+    voice = render_voice_input(key=f"chatbot_voice::{session_key}", label="🎙️ Tanya dengan suara")
+    if not voice or voice.get("status") != "final":
+        return None
+    voice_id = voice.get("id")
+    seen_key = f"chatbot_voice_seen::{session_key}"
+    if voice_id is None or voice_id == st.session_state.get(seen_key):
+        return None
+    st.session_state[seen_key] = voice_id
+    return (voice.get("text") or "").strip() or None
+
+
 def render_topic_chatbot(
     topic_label: str,
     sources: List[Dict],
@@ -202,6 +269,12 @@ def render_topic_chatbot(
             st.session_state[history_key] = []
             st.rerun()
 
+    speak_answers = st.toggle(
+        "🔊 Bacakan jawaban AI (text-to-speech)",
+        key=f"chatbot_tts::{session_key}",
+        help="Kalau aktif, tiap jawaban AI dibacakan memakai suara dari perangkat/browser Anda. Tidak ada data yang dikirim ke server.",
+    )
+
     if scoped:
         with st.expander(f"📚 Lihat {len(scoped)} sumber yang dipakai AI"):
             for i, item in enumerate(scoped, 1):
@@ -220,10 +293,13 @@ def render_topic_chatbot(
     # lalu st.rerun() seperti sebelumnya, sehingga bubble "AI sedang
     # mengetik..." benar-benar muncul di dalam area chat, bukan spinner
     # terpisah di luar kotak.
+    voice_question = _consume_voice_question(session_key)
     question = st.chat_input(
         f"Tanya sesuatu tentang '{topic_label}'...",
         key=f"chat_input::{session_key}",
     )
+    if not question and voice_question:
+        question = voice_question
 
     chat_box = st.container(height=height, border=True)
     with chat_box:
@@ -255,4 +331,14 @@ def render_topic_chatbot(
                 st.markdown(_linkify_citations(answer, citation_map))
             history.append({"role": "assistant", "content": answer})
 
+            if speak_answers:
+                _speak_component(_plain_text_for_speech(answer))
+
             st.session_state[history_key] = history
+
+
+if __name__ == "__main__":
+    assert _plain_text_for_speech("**Krisis** air [1] di NTT.") == "Krisis air di NTT."
+    assert _plain_text_for_speech("[judul](http://x) penting") == "judul penting"
+    assert _plain_text_for_speech("") == ""
+    print("chatbot self-check ok")

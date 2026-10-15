@@ -9,7 +9,7 @@ from app.core.page import setup_page
 from app.services.clustering_service import clustering_service
 from app import api_bridge
 
-setup_page("Scraping & Database", "📥", "pages/1_Scraping.py")
+setup_page("News Scraper", "📥", "pages/1_Scraping.py")
 
 @st.dialog("💬 Tanya AI", width="large")
 def _render_chat_dialog():
@@ -55,10 +55,10 @@ def _render_chat_dialog():
         st.error(f"Gagal memuat data untuk Tanya AI: {e}")
 
 
-# Header Halaman Utama[cite: 15]
+# Header Halaman Utama
 col_header, col_chat_trigger = st.columns([5, 1])
 with col_header:
-    st.markdown("# 📥 News Intelligence")
+    st.markdown("# 📥 News Scraper")
     st.caption("Google News Intelligence & Ringkasan Berita")
     st.markdown("Masukkan kata kunci untuk mengambil data berita terbaru dan hasilkan ringkasan berita.")
 with col_chat_trigger:
@@ -78,7 +78,7 @@ tab_scrape, tab_history, tab_cluster = st.tabs(
 with tab_scrape:
     with st.container(key="scraping_form_card"):
         st.subheader("⚙️ Parameter Pencarian Berita")
-        st.write("Masukkan topik atau kata kunci berita (Pencarian otomatis difilter dari 1 Januari 2026)[cite: 15].")
+        st.write("Masukkan topik atau kata kunci berita (pencarian otomatis difilter dari 1 Januari 2026).")
         
         with st.form("scraping_form"):
             keyword = st.text_input("Kata Kunci (Keyword):", st.session_state.get("current_keyword", "Transformasi Digital Indonesia"))
@@ -125,7 +125,19 @@ with tab_scrape:
                             f"✅ Ditemukan {fetched} entri, {processed} berhasil diproses, "
                             f"{saved} tersimpan sebagai artikel baru."
                         )
+                        # Data baru di database -> buang semua cache baca
+                        # (Dashboard/Predictive/Riwayat) DAN cache ringkasan
+                        # per-keyword di sesi ini, supaya modul lain langsung
+                        # melihat artikel baru, bukan data lama 60 detik kemudian.
+                        st.cache_data.clear()
+                        st.session_state["news_summary_cache"] = {}
                         st.session_state["trigger_auto_summary"] = keyword
+                        # Serahkan keyword ke modul lain: selector Predictive &
+                        # filter Dashboard langsung terisi keyword yang baru
+                        # di-scrape, jadi pengguna tidak memilih ulang.
+                        st.session_state["current_keyword"] = keyword
+                        st.session_state["predictive_keyword_select"] = keyword
+                        st.session_state["dashboard_keyword_filter"] = [keyword]
                     else:
                         status_text.warning("Gathering selesai, tapi tidak ada artikel baru tersimpan.")
                         st.warning(warning or "Tidak ada artikel baru yang tersimpan. Lihat app.log untuk detail.")
@@ -142,46 +154,75 @@ with tab_scrape:
 
     if active_keyword_to_summarize:
         st.subheader(f"📥 Ringkasan Berita Siap: '{active_keyword_to_summarize}'")
-        try:
-            with st.spinner("Menyusun ringkasan berita..."):
-                summary, summary_err = api_bridge.generate_news_summary(active_keyword_to_summarize)
-            if summary:
-                render_news_summary(summary)
-                try:
-                    df_topic = pd.DataFrame(api_bridge.get_articles(limit=1000))
-                    if "kata_kunci" in df_topic.columns:
-                        df_topic = df_topic[df_topic["kata_kunci"] == active_keyword_to_summarize]
-                    if not df_topic.empty:
-                        st.download_button(
-                            label=f"⬇️ Download Semua Berita '{active_keyword_to_summarize}' ({len(df_topic)} artikel) sebagai CSV",
-                            data=df_topic.to_csv(index=False, sep=";").encode("utf-8-sig"),
-                            file_name=f"Berita_{active_keyword_to_summarize.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                            mime="text/csv",
-                            width='stretch',
-                        )
-                except Exception as e:
-                    st.error(f"Gagal memuat berita untuk diunduh: {e}")
 
-                pdf_bytes, err = api_bridge.generate_news_summary_pdf(
-                    active_keyword_to_summarize,
-                    summary=summary,
-                    save_to_db=st.session_state.get("save_summary_to_db", False),
-                )
-                if pdf_bytes:
-                    st.toast(f"Ringkasan '{active_keyword_to_summarize}' siap diunduh!", icon="✅")
-                    st.download_button(
-                        label=f"📄 Download PDF Ringkasan '{active_keyword_to_summarize}'",
-                        data=pdf_bytes,
-                        file_name=f"Ringkasan_Berita_{active_keyword_to_summarize.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                        mime="application/pdf",
-                        width='stretch'
+        # Ringkasan AI + PDF-nya hanya dibangun SEKALI per keyword, lalu
+        # disimpan di session_state. Tanpa cache ini, SETIAP interaksi widget
+        # di halaman ini ikut memicu panggilan AI ulang untuk keyword yang sama
+        # (progress spinner muncul tiap klik, walaupun datanya tidak berubah).
+        # Cache dibuang saat scraping baru berhasil (lihat cabang saved > 0),
+        # jadi flag "Simpan ke Database" hanya berlaku pada pembangunan pertama.
+        summary_cache = st.session_state.setdefault("news_summary_cache", {})
+        entry = summary_cache.get(active_keyword_to_summarize)
+        if entry is None:
+            entry = {"summary": None, "summary_err": None, "pdf": None, "pdf_err": None}
+            try:
+                with st.spinner("Menyusun ringkasan berita..."):
+                    entry["summary"], entry["summary_err"] = api_bridge.generate_news_summary(
+                        active_keyword_to_summarize
                     )
-                else:
-                    st.error(f"PDF belum tersedia: {err}")
+                if entry["summary"]:
+                    with st.spinner("Menyiapkan PDF ringkasan..."):
+                        entry["pdf"], entry["pdf_err"] = api_bridge.generate_news_summary_pdf(
+                            active_keyword_to_summarize,
+                            summary=entry["summary"],
+                            save_to_db=st.session_state.get("save_summary_to_db", False),
+                        )
+            except Exception as e:
+                entry["summary_err"] = f"Gagal membuat ringkasan: {e}"
+            summary_cache[active_keyword_to_summarize] = entry
+
+        summary, summary_err = entry["summary"], entry["summary_err"]
+        pdf_bytes, pdf_err = entry["pdf"], entry["pdf_err"]
+
+        if summary:
+            render_news_summary(summary)
+            try:
+                df_topic = pd.DataFrame(api_bridge.get_articles(limit=1000))
+                if "kata_kunci" in df_topic.columns:
+                    df_topic = df_topic[df_topic["kata_kunci"] == active_keyword_to_summarize]
+                if not df_topic.empty:
+                    st.download_button(
+                        label=f"⬇️ Download Semua Berita '{active_keyword_to_summarize}' ({len(df_topic)} artikel) sebagai CSV",
+                        data=df_topic.to_csv(index=False, sep=";").encode("utf-8-sig"),
+                        file_name=f"Berita_{active_keyword_to_summarize.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime="text/csv",
+                        width='stretch',
+                    )
+            except Exception as e:
+                st.error(f"Gagal memuat berita untuk diunduh: {e}")
+
+            if pdf_bytes:
+                st.download_button(
+                    label=f"📄 Download PDF Ringkasan '{active_keyword_to_summarize}'",
+                    data=pdf_bytes,
+                    file_name=f"Ringkasan_Berita_{active_keyword_to_summarize.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf",
+                    width='stretch'
+                )
             else:
-                st.error(f"Ringkasan belum tersedia: {summary_err}")
-        except Exception as e:
-            st.error(f"Gagal membuat ringkasan: {e}")
+                st.error(f"PDF belum tersedia: {pdf_err}")
+
+            # --- LANJUT: keyword yang sama dipakai langsung di modul lain ---
+            st.markdown("#### ➡️ Lanjutkan Analisis")
+            nav1, nav2, nav3 = st.columns(3)
+            if nav1.button("📊 Lihat di Analytics Dashboard", width='stretch', key="nav_ke_dashboard"):
+                st.switch_page("pages/2_Dashboard.py")
+            if nav2.button("🔮 Analisis Prediktif", width='stretch', key="nav_ke_predictive"):
+                st.switch_page("pages/4_Predictive_Intelligence.py")
+            if nav3.button("💬 Tanya AI", width='stretch', key="nav_ke_chat"):
+                _render_chat_dialog()
+        else:
+            st.error(f"Ringkasan belum tersedia: {summary_err}")
     else:
         st.info("Jalankan scraping di atas untuk melihat ringkasan berita di sini.")
 
@@ -252,7 +293,7 @@ with tab_history:
 # ==================== TAB 3: STORY CLUSTERING & TIMELINE ====================
 with tab_cluster:
     st.subheader("🧩 Pengelompokan Cerita (Story Clustering) & Timeline")
-    st.caption("Artikel yang membahas peristiwa/isu yang sama otomatis dikelompokkan menjadi satu 'cerita'[cite: 15].")
+    st.caption("Artikel yang membahas peristiwa/isu yang sama otomatis dikelompokkan menjadi satu 'cerita'.")
 
     try:
         df_for_cluster = pd.DataFrame(api_bridge.get_articles(limit=500))

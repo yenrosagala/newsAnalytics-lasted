@@ -97,7 +97,7 @@ if submit_social:
                     if pdf_keyword:
                         st.markdown("### 🧠 Ringkasan Naratif (AI)")
                         with st.spinner("Membuat ringkasan naratif AI dari post yang terkumpul..."):
-                            summary, summary_posts, summary_err = api_bridge.generate_social_summary(pdf_keyword)
+                            summary, summary_posts, summary_err = api_bridge.generate_social_summary(pdf_keyword, posts=data.get("posts"))
 
                         if summary:
                             render_news_summary(summary)

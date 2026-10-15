@@ -36,7 +36,7 @@ def render_decision_brief(brief: dict, show_bibliography: bool = False) -> None:
     if brief.get("risks"):
         st.markdown("#### ⚠️ Risks")
         for r in brief["risks"]:
-            color = SEVERITY_COLORS.get(r.get("severity", "Sedang"), "#64748b")
+            color = SEVERITY_COLORS.get(r.get("severity", "Sedang"), "#8fb4d6")
             badge = (
                 f"<span style='background:{color}22; color:{color}; border:1px solid {color}66; "
                 f"border-radius:6px; padding:1px 8px; font-size:0.72rem; font-weight:700; margin-left:6px;'>"
@@ -45,7 +45,7 @@ def render_decision_brief(brief: dict, show_bibliography: bool = False) -> None:
             st.markdown(f"- {r.get('risk', '')} {badge}", unsafe_allow_html=True)
             if r.get("rationale"):
                 st.markdown(
-                    f"<p style='color:#64748b; font-size:0.82rem; margin:0 0 6px 16px;'>↳ {r['rationale']}</p>",
+                    f"<p style='color:#8fb4d6; font-size:0.82rem; margin:0 0 6px 16px;'>↳ {r['rationale']}</p>",
                     unsafe_allow_html=True,
                 )
         st.markdown("")
