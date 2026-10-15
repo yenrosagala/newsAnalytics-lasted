@@ -4,7 +4,7 @@ himpunan artikel/pustaka yang sedang aktif di halaman -- hasil scraping
 berita per keyword (pages/1_Scraping.py) atau daftar pustaka konsolidasi
 hasil AI Investigator (pages/3_Fenomena.py).
 
-Berbeda dari executive_summary_service (satu kali generate, hasil statis
+Berbeda dari news_summary_service (satu kali generate, hasil statis
 disimpan ke DB), komponen ini interaktif: riwayat percakapan disimpan di
 st.session_state per `session_key`, sehingga tiap keyword/investigasi punya
 riwayat sendiri dan tidak tercampur saat pengguna berpindah topik dalam satu

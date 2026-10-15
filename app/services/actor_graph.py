@@ -20,6 +20,7 @@ import re
 from typing import Dict, List
 
 from app.core.logger import get_logger
+from app.core.theme import CHART_LAYOUT
 from app.services.ai_service import ai_service
 
 logger = get_logger("ActorGraph")
@@ -31,17 +32,6 @@ _TYPE_COLORS = {
     "institusi": "#0ea5e9",   # sky
 }
 _LEVEL_COLOR = "#2563eb"
-
-_LAYOUT = dict(
-    template="plotly_white",
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font_color="#1a2233",
-    title_font_color="#1a2233",
-    margin=dict(t=48, b=10, l=10, r=10),
-    showlegend=True,
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-)
 
 
 # --- Ekstraksi entitas per level ---------------------------------------------
@@ -310,6 +300,6 @@ def build_actor_graph_fig(graph_data: Dict):
         yaxis=dict(visible=False),
         height=max(460, 260 * (max((n["depth"] for n in level_nodes), default=1) + 1)),
         hovermode="closest",
-        **_LAYOUT,
+        **CHART_LAYOUT,
     )
     return fig

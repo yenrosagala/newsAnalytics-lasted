@@ -1,23 +1,35 @@
-import datetime
+"""Service RINGKASAN BERITA (news summary) untuk halaman Scraping.
+
+Menghasilkan esai naratif {title, summary} dari korpus berita/media hasil
+scraping -- BUKAN Executive Intelligence Brief S-R-I-R (itu milik halaman AI
+Investigator / Fenomena, lihat decision_brief). Dipakai:
+  - halaman Scraping berita (pages/1_Scraping.py)
+  - halaman Social Media Scraper (pages/5_Social_Media_Scraper.py)
+
+Menggantikan executive_summary_service lama yang membuat brief S-R-I-R.
+"""
+import json
 import re
 from collections import Counter
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import pandas as pd
 
 from app.core.logger import get_logger
-from app.prompts.executive_summary import get_executive_summary_system_prompt, get_executive_summary_user_prompt
+from app.prompts.news_summary import get_news_summary_system_prompt, get_news_summary_user_prompt
 from app.services.ai_service import ai_service
 from app.services.database_service import db_service
-from app.services.decision_brief import parse_decision_brief_json, serialize_brief
 from app.services.pdf_service import generate_pdf_report, fig_to_png_buffer
 from app.services.geo_service import build_location_hotspots
+from app.core.theme import SENTIMENT_COLORS
 
-logger = get_logger("ExecutiveSummaryService")
+logger = get_logger("NewsSummaryService")
 
 MAX_ARTICLES_FOR_SUMMARY = 15
 MAX_PROMPT_CHARS = 28000
 MAX_ARTICLE_TEXT_CHARS = 2500
+
+SUMMARY_SECTION_TITLE = "Ringkasan Berita"
 
 
 def _sanitize_article_block(article: dict, index: int) -> str:
@@ -103,7 +115,7 @@ def _build_data_context(keyword: str, articles: List[dict], date_range_str: str,
         f"Total artikel dalam korpus: {len(articles)}\n"
         f"Rentang waktu publikasi: {date_range_str}\n"
         f"Top media kontributor: {top_media_str}\n"
-        "Gunakan data ini sebagai konteks untuk membuat Executive Brief yang komprehensif."
+        "Gunakan data ini sebagai konteks untuk menyusun ringkasan berita."
     )
 
 
@@ -124,99 +136,58 @@ def _extract_topic_keywords(articles: List[dict], max_keywords: int = 5) -> List
     return [word for word, _ in keyword_counts.most_common(max_keywords)]
 
 
-def _build_offline_brief(keyword: str, articles: List[dict], date_range_str: str, top_media_str: str) -> dict:
+def _parse_summary_json(raw, fallback_title: str) -> dict:
+    """Ambil {title, summary} dari keluaran AI yang harusnya JSON. Toleran
+    terhadap code fence / teks pembungkus; kalau gagal, pakai seluruh teks
+    sebagai summary supaya pengguna tetap mendapat sesuatu yang berguna."""
+    text = raw if isinstance(raw, str) else str(raw or "")
+    text = text.strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        try:
+            obj = json.loads(text[start:end + 1])
+            title = str(obj.get("title") or "").strip()
+            summary = str(obj.get("summary") or "").strip()
+            if summary:
+                return {"title": title or fallback_title, "summary": summary}
+        except Exception:
+            pass
+    return {"title": fallback_title, "summary": text}
+
+
+def _build_offline_summary(keyword: str, articles: List[dict], date_range_str: str, top_media_str: str) -> dict:
     top_keywords = _extract_topic_keywords(articles)
     topic_summary = ", ".join(top_keywords[:3]) if top_keywords else keyword
-    unique_sources = []
+    sources = []
     for article in articles:
         source = article.get("media") or article.get("source") or "Unknown"
-        if source not in unique_sources:
-            unique_sources.append(source)
-        if len(unique_sources) >= 5:
+        if source not in sources:
+            sources.append(source)
+        if len(sources) >= 5:
             break
 
-    bibliography_items = [f"[{idx}] {source}." for idx, source in enumerate(unique_sources, start=1)]
-    bibliography = "\n".join(bibliography_items)
-
-    title = f"Executive Summary {keyword} (Offline)"
-    situation = (
-        f"Laporan ini disusun secara offline dari {len(articles)} artikel yang berkaitan dengan kata kunci '{keyword}'. "
-        f"Rentang waktu publikasi adalah {date_range_str}, dan top media kontributor adalah {top_media_str}. "
-        f"Topik utama yang tampak dari judul-judul artikel berfokus pada {topic_summary}. "
-        "Karena layanan AI tidak tersedia saat pembuatan laporan, ringkasan ini dibuat dari judul, sumber, dan potongan konten artikel yang tersedia."
+    title = f"Ringkasan Berita {keyword} (Offline)"
+    summary = (
+        f"Ringkasan ini disusun secara offline dari {len(articles)} artikel yang berkaitan dengan kata kunci "
+        f"'{keyword}'. Rentang waktu publikasi adalah {date_range_str}, dengan media kontributor teratas "
+        f"{top_media_str}. Dari judul-judul artikel, topik yang paling menonjol berkisar pada {topic_summary}.\n\n"
+        "Karena layanan AI tidak tersedia saat ringkasan dibuat, ikhtisar ini hanya dibentuk dari judul, sumber, "
+        "dan potongan awal konten yang tersedia. Media yang paling sering muncul juga cenderung mendominasi narasi "
+        "sehingga sudut pandang lain bisa kurang terwakili.\n\n"
+        f"Sumber yang tercakup antara lain: {', '.join(sources) if sources else 'tidak tersedia'}. "
+        "Gunakan ringkasan ini sebagai gambaran awal, bukan sebagai kesimpulan akhir, dan baca artikel lengkap "
+        "untuk konteks yang lebih utuh."
     )
-    situation += (
-        " Sumber berita utama telah dimasukkan sebagai bibliografi untuk membantu verifikasi lebih lanjut. "
-        "Gunakan laporan ini sebagai gambaran awal, bukan analisis akhir."
-    )
-
-    risks = [
-        {
-            "risk": "Ringkasan offline dapat kehilangan konteks mendalam karena hanya mengandalkan judul dan kutipan awal artikel.",
-            "severity": "Tinggi",
-            "rationale": "Analisis ini tidak dilakukan oleh model AI, sehingga detail kebijakan dan implikasi strategis mungkin kurang lengkap.",
-        },
-        {
-            "risk": "Media yang paling sering muncul dapat mendominasi narasi, sementara sumber lain cenderung kurang terwakili.",
-            "severity": "Sedang",
-            "rationale": "Ringkasan offline dibangun dari sumber yang tersedia tanpa normalisasi lanjutan pada distribusi media.",
-        },
-        {
-            "risk": "Bahasa dan fokus isu bisa menjadi terlalu umum, sehingga beberapa nuansa topik tidak tertangkap secara akurat.",
-            "severity": "Rendah",
-            "rationale": "Pendekatan heuristik ini menekankan headline dan metadata, bukan sintetis interpretasi kontekstual penuh.",
-        },
-    ]
-
-    impact = (
-        "Ringkasan offline ini masih memberi gambaran umum atas isu yang menonjol dalam korpus berita, khususnya tren dan fokus sumber yang paling sering muncul. "
-        "Namun, laporan ini mungkin tidak mencakup seluruh ragam perspektif, dan nilai strategisnya terbatas pada insight permukaan."
-    )
-    impact += (
-        " Untuk keputusan yang memerlukan detail kebijakan atau analisis risiko mendalam, disarankan melengkapi ringkasan ini dengan studi artikel penuh atau dukungan analis manusia yang tersedia."
-    )
-
-    recommendations = [
-        "Baca ulang artikel lengkap dari sumber utama yang tercantum di bibliografi untuk memastikan konteks dan akurasi informasi.",
-        "Gunakan ringkasan offline ini sebagai titik awal diskusi, bukan sebagai kesimpulan final.",
-        "Aktifkan kembali akses AI atau libatkan analis manusia begitu layanan eksternal tersedia untuk mendapatkan analisis yang lebih mendalam.",
-        "Pantau kembali perkembangan topik ini dalam berita berikutnya untuk menangkap perubahan cepat yang mungkin belum tercakup di laporan ini.",
-    ]
-
-    return {
-        "title": title,
-        "situation": situation,
-        "risks": risks,
-        "impact": impact,
-        "recommendations": recommendations,
-        "bibliography": bibliography,
-    }
+    return {"title": title, "summary": summary}
 
 
-def _build_insights(brief: dict) -> List[str]:
-    insights = []
-    if brief.get("title"):
-        insights.append(brief["title"])
-    if brief.get("situation"):
-        sentences = [p.strip() for p in brief["situation"].split("\n") if p.strip()]
-        insights.extend(sentences[:2])
-    if brief.get("risks"):
-        insights.extend([r.get("risk", "") for r in brief["risks"] if r.get("risk")])
-    if len(insights) < 3:
-        insights.append("Executive summary disusun dari korpus berita terkait kata kunci.")
-    return insights
-
-
-class ExecutiveSummaryService:
-    def generate_executive_summary(self, keyword: str, articles: List[dict], save_to_db: bool = False) -> dict:
+class NewsSummaryService:
+    def generate_summary(self, keyword: str, articles: List[dict], save_to_db: bool = False) -> dict:
+        """Kembalikan {"title", "summary"} berupa esai naratif dari korpus berita."""
         if not articles:
             return {
-                "title": f"Executive Summary {keyword}",
-                "situation": "Tidak ada artikel yang tersedia untuk kata kunci ini.",
-                "risks": [],
-                "impact": "",
-                "recommendations": [],
-                "bibliography": "",
+                "title": f"Ringkasan Berita {keyword}",
+                "summary": "Tidak ada artikel yang tersedia untuk kata kunci ini.",
             }
 
         date_range_str = _get_date_range_str(articles)
@@ -229,12 +200,12 @@ class ExecutiveSummaryService:
                 "sebagai sumber ringkasan untuk menjaga batas prompt."
             )
 
-        system_prompt = get_executive_summary_system_prompt(
+        system_prompt = get_news_summary_system_prompt(
             display_title_keyword=keyword,
             date_range_str=date_range_str,
             t_media_str=top_media_str,
         )
-        user_prompt = get_executive_summary_user_prompt(
+        user_prompt = get_news_summary_user_prompt(
             data_context=_build_data_context(keyword, articles, date_range_str, top_media_str),
             concatenated_content=concatenated_content,
             catatan_regenerate=note,
@@ -242,31 +213,32 @@ class ExecutiveSummaryService:
 
         try:
             raw = ai_service.generate(user_prompt, force_json=True, system_prompt=system_prompt)
-            brief = parse_decision_brief_json(raw, fallback_title=f"Executive Summary {keyword}")
+            summary = _parse_summary_json(raw, fallback_title=f"Ringkasan Berita {keyword}")
         except Exception as e:
-            logger.error(f"Gagal membuat executive summary AI: {e}")
-            brief = _build_offline_brief(keyword, articles, date_range_str, top_media_str)
+            logger.error(f"Gagal membuat ringkasan berita AI: {e}")
+            summary = _build_offline_summary(keyword, articles, date_range_str, top_media_str)
 
-        if not brief.get("title"):
-            brief["title"] = f"Executive Summary {keyword}"
+        if not summary.get("title"):
+            summary["title"] = f"Ringkasan Berita {keyword}"
 
         if save_to_db:
             try:
-                db_service.save_executive_summary_to_db(keyword, date_range_str, serialize_brief(brief))
+                db_service.save_executive_summary_to_db(
+                    keyword, date_range_str, json.dumps(summary, ensure_ascii=False)
+                )
             except Exception as e:
-                logger.warning(f"Gagal menyimpan cache executive summary: {e}")
+                logger.warning(f"Gagal menyimpan cache ringkasan berita: {e}")
 
-        return brief
+        return summary
 
     def create_pdf_bytes(
-        self, keyword: str, articles: List[dict], brief: Optional[dict] = None, save_to_db: bool = False
+        self, keyword: str, articles: List[dict], summary: Optional[dict] = None, save_to_db: bool = False
     ) -> bytes:
-        """brief: kirim Executive Brief yang sudah pernah dibuat (mis. lewat
-        generate_executive_summary()) untuk menghindari memanggil AI dua kali
-        ketika ringkasan sudah ditampilkan inline sebelum PDF diunduh. Kalau
-        None, brief akan dibuat baru seperti perilaku sebelumnya.
-        save_to_db: teruskan ke generate_executive_summary() kalau brief belum
-        ada -- default False supaya hasil generate tidak otomatis masuk DB."""
+        """summary: kirim Ringkasan Berita yang sudah dibuat (mis. lewat
+        generate_summary()) agar AI tidak dipanggil dua kali ketika ringkasan
+        sudah ditampilkan inline sebelum PDF diunduh. Kalau None, ringkasan
+        dibuat baru. save_to_db diteruskan ke generate_summary() bila summary
+        belum ada -- default False."""
         df = pd.DataFrame(articles)
         if not df.empty:
             rename_map = {
@@ -279,11 +251,21 @@ class ExecutiveSummaryService:
             }
             df = df.rename(columns=rename_map)
 
-        brief = brief or self.generate_executive_summary(keyword, articles, save_to_db=save_to_db)
-        attempts = brief.get("title", keyword)
+        summary = summary or self.generate_summary(keyword, articles, save_to_db=save_to_db)
         date_range_str = _get_date_range_str(articles)
         top_media_str = _get_top_media_str(articles)
-        insights = _build_insights(brief)
+
+        # Renderer PDF mengharapkan dict "brief"; esai naratif ditaruh di
+        # `situation`, sisanya dikosongkan. plain_body=True mematikan subjudul
+        # S-R-I-R dan brief_section_title mengganti judul seksi.
+        brief = {
+            "title": summary.get("title", keyword),
+            "situation": summary.get("summary", ""),
+            "risks": [],
+            "impact": "",
+            "recommendations": [],
+            "bibliography": "",
+        }
 
         extra_graphs = []
         spatial_buf = self._build_spatial_map_buffer(df)
@@ -291,15 +273,16 @@ class ExecutiveSummaryService:
             extra_graphs.append(("Peta Sebaran Lokasi Berita (Spatial Intelligence)", spatial_buf))
 
         return generate_pdf_report(
-            df, insights, keyword, date_range_str, top_media_str, brief,
+            df, [], keyword, date_range_str, top_media_str, brief,
             extra_graphs=extra_graphs,
+            brief_section_title=SUMMARY_SECTION_TITLE,
+            plain_body=True,
         )
 
     @staticmethod
     def _build_spatial_map_buffer(df: pd.DataFrame):
-        """Bangun peta hotspot lokasi (Plotly scatter_geo, sama seperti tab
-        Spatial Intelligence di Dashboard) dan rasterisasi ke PNG untuk PDF.
-        Return None kalau data kosong / tidak ada lokasi terdeteksi / gagal
+        """Bangun peta hotspot lokasi (Plotly scatter_geo) dan rasterisasi ke PNG
+        untuk PDF. Return None kalau data kosong / tidak ada lokasi / gagal
         render -- PDF tetap valid tanpa peta ini."""
         if df is None or df.empty or "judul" not in df.columns:
             return None
@@ -319,10 +302,7 @@ class ExecutiveSummaryService:
                 size="mention_count",
                 hover_name="location",
                 color="dominant_sentiment",
-                color_discrete_map={
-                    "Positive": "#10b981", "Negative": "#ef4444", "Neutral": "#64748b",
-                    "POSITIVE": "#10b981", "NEGATIVE": "#ef4444", "NEUTRAL": "#64748b",
-                },
+                color_discrete_map=SENTIMENT_COLORS,
                 projection="natural earth",
                 title="Sebaran Hotspot Berita di Indonesia",
             )
@@ -338,4 +318,4 @@ class ExecutiveSummaryService:
             return None
 
 
-executive_summary_service = ExecutiveSummaryService()
+news_summary_service = NewsSummaryService()

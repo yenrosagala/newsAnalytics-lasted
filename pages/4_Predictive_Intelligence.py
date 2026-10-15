@@ -2,34 +2,22 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-from app.core.config import Config
 from app.core.logger import setup_logger
-from app.core.auth import render_auth_sidebar
-from app.components.sidebar import load_custom_css, render_app_sidebar
+from app.core.page import setup_page
 from app import api_bridge
 from app.services.database_service import DatabaseConnectionError
+from app.core.theme import ACCENT, AMBER, CHART_LAYOUT, MUTED, NEGATIVE, SEVERITY_COLORS
 
-config = Config()
 logger = setup_logger("page_predictive")
 
-# Konfigurasi Halaman[cite: 18]
-st.set_page_config(page_title="Predictive Intelligence", layout="wide", page_icon="🔮")
-
-load_custom_css()
-render_app_sidebar(active_page="pages/4_Predictive_Intelligence.py")
-render_auth_sidebar()
+setup_page("Predictive Intelligence", "🔮", "pages/4_Predictive_Intelligence.py")
 
 st.markdown("# 🔮 Predictive Intelligence")
 st.caption("Trend Detection · Forecasting · Anomaly Detection (Terintegrasi API)")
 st.markdown("Analisis pola volume & sentimen berita dari waktu ke waktu...[cite: 18]")
 st.markdown("---")
 
-SEVERITY_COLORS = {"Tinggi": "#ef4444", "Sedang": "#f59e0b", "Rendah": "#10b981"}
-_DARK_LAYOUT = dict(
-    template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font_color="#1a2233", title_font_color="#1a2233", margin=dict(t=30, b=10, l=10, r=10),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-)
+_DARK_LAYOUT = {**CHART_LAYOUT, "margin": dict(t=30, b=10, l=10, r=10)}
 
 @st.cache_data(ttl=120)
 def _get_available_keywords():
@@ -80,7 +68,7 @@ with tab_alerts:
         st.success(f"✅ Tidak ada peringatan signifikan untuk '{selected_keyword}' saat ini.")
     else:
         for a in alerts:
-            color = SEVERITY_COLORS.get(a["severity"], "#64748b")
+            color = SEVERITY_COLORS.get(a["severity"], MUTED)
             icon = "🚨" if a["type"] == "anomaly" else "📊"
             st.markdown(f"<div style='background:{color}15; border-left:4px solid {color}; padding:10px 14px; border-radius:6px; margin-bottom:8px;'><b>{icon} [{a['severity']}]</b> {a['message']}</div>", unsafe_allow_html=True)
 
@@ -100,7 +88,7 @@ with tab_trend:
 
         fig = go.Figure()
         fig.add_trace(go.Bar(x=dates, y=counts, name="Volume Harian", marker_color="rgba(56,189,248,0.35)"))
-        fig.add_trace(go.Scatter(x=dates, y=ma7_counts, name="Moving Average (7 hari)", line=dict(color="#2563eb", width=2.5)))
+        fig.add_trace(go.Scatter(x=dates, y=ma7_counts, name="Moving Average (7 hari)", line=dict(color=ACCENT, width=2.5)))
         fig.update_layout(xaxis_title="Tanggal", yaxis_title="Jumlah Artikel", **_DARK_LAYOUT)
         st.plotly_chart(fig, width='stretch')
     else:
@@ -114,9 +102,9 @@ with tab_forecast:
     else:
         fig_fc = go.Figure()
         if "date" in daily_volume_data:
-            fig_fc.add_trace(go.Scatter(x=daily_volume_data["date"], y=daily_volume_data["count"], name="Data Historis", line=dict(color="#2563eb")))
+            fig_fc.add_trace(go.Scatter(x=daily_volume_data["date"], y=daily_volume_data["count"], name="Data Historis", line=dict(color=ACCENT)))
         
-        fig_fc.add_trace(go.Scatter(x=forecast["forecast_dates"], y=forecast["forecast_values"], name="Proyeksi", line=dict(color="#f59e0b", dash="dot")))
+        fig_fc.add_trace(go.Scatter(x=forecast["forecast_dates"], y=forecast["forecast_values"], name="Proyeksi", line=dict(color=AMBER, dash="dot")))
         fig_fc.add_trace(go.Scatter(
             x=list(forecast["forecast_dates"]) + list(forecast["forecast_dates"][::-1]),
             y=list(forecast["upper_band"]) + list(forecast["lower_band"][::-1]),
@@ -140,8 +128,8 @@ with tab_anomaly:
         normal_pts = anomalies_df[~anomalies_df["is_anomaly"]]
         anomaly_pts = anomalies_df[anomalies_df["is_anomaly"]]
 
-        fig_anom.add_trace(go.Scatter(x=normal_pts["tanggal"], y=normal_pts["nilai"], mode="markers+lines", name="Normal", line=dict(color="#2563eb"), marker=dict(size=6)))
-        fig_anom.add_trace(go.Scatter(x=anomaly_pts["tanggal"], y=anomaly_pts["nilai"], mode="markers", name="Anomali", marker=dict(size=13, color="#ef4444", symbol="x")))
+        fig_anom.add_trace(go.Scatter(x=normal_pts["tanggal"], y=normal_pts["nilai"], mode="markers+lines", name="Normal", line=dict(color=ACCENT), marker=dict(size=6)))
+        fig_anom.add_trace(go.Scatter(x=anomaly_pts["tanggal"], y=anomaly_pts["nilai"], mode="markers", name="Anomali", marker=dict(size=13, color=NEGATIVE, symbol="x")))
         fig_anom.update_layout(xaxis_title="Tanggal", yaxis_title="Jumlah Artikel", **_DARK_LAYOUT)
         st.plotly_chart(fig_anom, width='stretch')
 

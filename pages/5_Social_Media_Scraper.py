@@ -3,17 +3,12 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from app.components.sidebar import load_custom_css, render_app_sidebar
 from app.components.social_summary import render_social_summary
-from app.components.decision_brief_view import render_decision_brief
-from app.core.auth import render_auth_sidebar
+from app.components.news_summary_view import render_news_summary
+from app.core.page import setup_page
 from app import api_bridge
 
-st.set_page_config(page_title="Social Media Scraper", layout="wide", page_icon="🌐")
-
-load_custom_css()
-render_app_sidebar(active_page="pages/5_Social_Media_Scraper.py")
-render_auth_sidebar()
+setup_page("Social Media Scraper", "🌐", "pages/5_Social_Media_Scraper.py")
 
 st.markdown("# 🌐 Social Media Scraper")
 st.caption("Scraping konten publik dari Facebook, Instagram, YouTube, Threads, dan X/Twitter (Selenium).")
@@ -102,13 +97,13 @@ if submit_social:
                     if pdf_keyword:
                         st.markdown("### 🧠 Ringkasan Naratif (AI)")
                         with st.spinner("Membuat ringkasan naratif AI dari post yang terkumpul..."):
-                            brief, brief_posts, brief_err = api_bridge.generate_social_executive_summary(pdf_keyword)
+                            summary, summary_posts, summary_err = api_bridge.generate_social_summary(pdf_keyword)
 
-                        if brief:
-                            render_decision_brief(brief, show_bibliography=True)
+                        if summary:
+                            render_news_summary(summary)
                             try:
                                 pdf_bytes, pdf_err = api_bridge.generate_social_summary_pdf(
-                                    pdf_keyword, brief=brief, posts=brief_posts
+                                    pdf_keyword, summary=summary, posts=summary_posts
                                 )
                                 if pdf_bytes:
                                     safe_name = "".join(
@@ -126,7 +121,7 @@ if submit_social:
                             except Exception as e:
                                 st.error(f"Gagal membuat PDF ringkasan sosial: {e}")
                         else:
-                            st.warning(f"Ringkasan naratif AI tidak tersedia: {brief_err}")
+                            st.warning(f"Ringkasan naratif AI tidak tersedia: {summary_err}")
                     elif platform == "all":
                         st.info(
                             "Tip: beri Label Kata Kunci agar sistem dapat membuat ringkasan naratif AI dari semua posting sosial yang dikumpulkan untuk target ini."

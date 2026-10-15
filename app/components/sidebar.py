@@ -2,19 +2,18 @@
 Shared app chrome: custom CSS loading + sidebar navigation.
 
 Sebelumnya, blok ini (load CSS + 4 st.page_link + caption info) di-copy-paste
-persis sama di streamlit_app.py, pages/1_Scraping.py, pages/2_Dashboard.py,
-dan pages/3_Fenomena.py -- kalau menu berubah (nama, ikon, urutan), harus
-diedit di 4 tempat sekaligus dan gampang lupa satu. Sekarang jadi SATU
-sumber kebenaran di sini, dipanggil dari tiap halaman dengan 2 baris:
-
-    from app.components.sidebar import load_custom_css, render_app_sidebar
-    load_custom_css()
-    render_app_sidebar(active_page="pages/1_Scraping.py")
+persis sama di tiap halaman -- kalau menu berubah (nama, ikon, urutan), harus
+diedit di banyak tempat sekaligus dan gampang lupa satu. Sekarang jadi SATU
+sumber kebenaran di sini.
 
 Catatan: widget status login (render_auth_sidebar di app/core/auth.py)
 sengaja TETAP terpisah dari file ini -- itu murni tentang autentikasi,
 sedangkan file ini murni tentang navigasi & tampilan, dua concern yang
-berbeda meskipun sama-sama muncul di sidebar.
+berbeda meskipun sama-sama muncul di sidebar. Yang menggabungkan keduanya
+(CSS + nav + auth) adalah app/core/page.py::setup_page, dipanggil tiap
+halaman dengan satu baris:
+
+    setup_page("Analytics", "📊", "pages/2_Dashboard.py")
 """
 import os
 

@@ -44,49 +44,6 @@ def build_daily_volume_series(
     return daily
 
 
-def build_sentiment_trend(
-    df: pd.DataFrame, date_col: str = "waktu_tampilan", sentiment_col: str = "Sentimen"
-) -> pd.DataFrame:
-    if df.empty or date_col not in df.columns or sentiment_col not in df.columns:
-        return pd.DataFrame()
-
-    work = df.copy()
-    work[date_col] = pd.to_datetime(work[date_col], errors="coerce")
-    work = work.dropna(subset=[date_col])
-    if work.empty:
-        return pd.DataFrame()
-
-    def _norm(v):
-        v = str(v).strip().lower()
-        if v.startswith("pos"):
-            return "Positif"
-        if v.startswith("neg"):
-            return "Negatif"
-        return "Netral"
-
-    work["_sentimen_norm"] = work[sentiment_col].apply(_norm)
-    work["_tanggal"] = work[date_col].dt.date
-
-    pivot = work.groupby(["_tanggal", "_sentimen_norm"]).size().unstack(fill_value=0)
-    for col in ["Positif", "Negatif", "Netral"]:
-        if col not in pivot.columns:
-            pivot[col] = 0
-    pivot.index = pd.to_datetime(pivot.index)
-    pivot = pivot.sort_index()
-
-    total = pivot[["Positif", "Negatif", "Netral"]].sum(axis=1).replace(0, np.nan)
-    pct = pivot[["Positif", "Negatif", "Netral"]].div(total, axis=0) * 100
-    pct = pct.fillna(0).round(1)
-    pct.index.name = "tanggal"
-    return pct
-
-
-def compute_moving_average(daily_series: pd.Series, window: int = DEFAULT_TREND_WINDOW_DAYS) -> pd.Series:
-    if daily_series.empty:
-        return daily_series
-    return daily_series.rolling(window=window, min_periods=1).mean()
-
-
 def classify_trend(
     daily_series: pd.Series,
     recent_days: int = DEFAULT_TREND_WINDOW_DAYS,

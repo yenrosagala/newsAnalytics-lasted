@@ -1,25 +1,18 @@
 from datetime import datetime
 import streamlit as st
 
-from app.core.auth import render_auth_sidebar
-from app.core.config import Config
 from app.core.logger import setup_logger
+from app.core.page import setup_page
 from app.components.decision_brief_view import render_decision_brief
 from app.components.chatbot import render_topic_chatbot
-from app.components.sidebar import load_custom_css, render_app_sidebar
 from app.services.evidence_graph import build_evidence_graph_fig
 from app.services.actor_graph import build_actor_graph_fig
+from app.core.theme import MUTED, TIER_COLORS
 from app import api_bridge
 
-config = Config()
 logger = setup_logger("page_fenomena")
 
-# Konfigurasi Halaman[cite: 17]
-st.set_page_config(page_title="AI Investigator", layout="wide", page_icon="🕵️")
-
-load_custom_css()
-render_app_sidebar(active_page="pages/3_Fenomena.py")
-render_auth_sidebar()
+setup_page("AI Investigator", "🕵️", "pages/3_Fenomena.py")
 
 st.markdown("# 🕵️ AI Investigator")
 st.caption("Recursive Root Cause Analysis · Evidence Graph (Terintegrasi API)")
@@ -47,13 +40,13 @@ def _render_level_details(level_info: dict, depth: int, total_levels: int, url_t
 
         if level_info.get("causes_extracted"):
             st.markdown("<b>🔍 Penyebab Teridentifikasi (dengan Skor Keyakinan):</b>", unsafe_allow_html=True)
-            _tier_colors = {"Tinggi": "#10b981", "Sedang": "#f59e0b", "Rendah": "#ef4444"}
+            _tier_colors = TIER_COLORS
             for c in level_info["causes_extracted"]:
                 if isinstance(c, dict):
                     detail = c.get("confidence_detail") or {}
                     composite = detail.get("composite")
                     tier = detail.get("tier", "Rendah")
-                    color = _tier_colors.get(tier, "#64748b")
+                    color = _tier_colors.get(tier, MUTED)
                     badge = f"<span style='background:{color}22; color:{color}; border:1px solid {color}66; border-radius:6px; padding:1px 8px; font-size:0.72rem; font-weight:700; margin-left:6px;'>{composite}% · {tier}</span>" if composite is not None else ""
                     st.markdown(f"- {c.get('cause', '')} {badge}", unsafe_allow_html=True)
                     if c.get("rationale"):
@@ -141,7 +134,7 @@ def _render_investigation_results(title: str, brief: dict, citation_warning: str
             _render_fenomena_chat_dialog(query_key, consolidated_bib)
 
     sub_tab_brief, sub_tab_graph, sub_tab_actors, sub_tab_tree = st.tabs(
-        ["📋 Executive Brief", "🕸️ Evidence Graph", "🧑‍🤝‍🧑 Peta Aktor", "🌳 Root Cause Tree"]
+        ["📋 Executive Intelligence Brief", "🕸️ Evidence Graph", "🧑‍🤝‍🧑 Peta Aktor", "🌳 Root Cause Tree"]
     )
 
     with sub_tab_brief:

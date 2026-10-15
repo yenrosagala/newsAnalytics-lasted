@@ -5,9 +5,10 @@ def render_decision_brief(brief: dict, show_bibliography: bool = False) -> None:
     """Render satu Decision Intelligence Executive Brief (Situation / Risks /
     Impact / Recommendations) ke UI Streamlit dengan styling konsisten.
 
-    Dipakai oleh AI Investigator (pages/3_Fenomena.py) dan oleh Social Media
-    Scraper (pages/5_Social_Media_Scraper.py) untuk menampilkan ringkasan
-    naratif AI langsung di halaman, sebelum PDF-nya diunduh.
+    Dipakai oleh AI Investigator (pages/3_Fenomena.py) untuk menampilkan
+    Executive Intelligence Brief langsung di halaman, sebelum PDF-nya diunduh.
+    (Halaman Scraping & Social Media Scraper kini memakai Ringkasan Berita
+    naratif lewat app/components/news_summary_view.py.)
     """
     # Import lokal (bukan di top-level modul) supaya file ini tidak pernah
     # ikut serta dalam rantai circular-import apa pun saat Python meng-import

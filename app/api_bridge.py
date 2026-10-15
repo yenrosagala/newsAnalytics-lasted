@@ -20,7 +20,7 @@ from app.core.logger import get_logger
 from app.services.database_service import db_service, DatabaseConnectionError
 from app.services.scraper_service import scraper_service
 from app.services.social_scraper_service import social_scraper_service
-from app.services.executive_summary_service import executive_summary_service
+from app.services.news_summary_service import news_summary_service
 from app.services.ai_service import ai_service
 from app.services.predictive_service import (
     build_daily_volume_series,
@@ -58,10 +58,10 @@ def execute_scraping(
     return {"status": "success", "keyword": keyword, **result}
 
 
-def generate_summary_pdf(keyword: str, save_to_db: bool = False) -> tuple[Optional[bytes], Optional[str]]:
-    """Returns (pdf_bytes, error). Creates a combined executive summary PDF for a keyword.
-    save_to_db: default False -- ringkasan hanya dipakai untuk PDF ini, tidak
-    otomatis ditulis ke tabel executive_summaries di Supabase."""
+def generate_news_summary(keyword: str) -> tuple[Optional[dict], Optional[str]]:
+    """Returns (summary, error). Ringkasan berita naratif {title, summary} dari
+    korpus berita tersimpan untuk suatu keyword, untuk ditampilkan inline di
+    halaman Scraping. Tidak menulis ke DB."""
     try:
         df = db_service.get_latest_scraped_data(limit=1000)
     except DatabaseConnectionError as e:
@@ -75,10 +75,37 @@ def generate_summary_pdf(keyword: str, save_to_db: bool = False) -> tuple[Option
 
     articles = df_kw.to_dict(orient="records")
     try:
-        pdf_bytes = executive_summary_service.create_pdf_bytes(keyword, articles, save_to_db=save_to_db)
+        return news_summary_service.generate_summary(keyword, articles), None
+    except Exception as e:
+        return None, f"Gagal membangun ringkasan berita: {e}"
+
+
+def generate_news_summary_pdf(
+    keyword: str, summary: Optional[dict] = None, save_to_db: bool = False
+) -> tuple[Optional[bytes], Optional[str]]:
+    """Returns (pdf_bytes, error). Ringkasan Berita (news summary) PDF untuk
+    suatu keyword. Kirim `summary` hasil generate_news_summary() agar AI tidak
+    dipanggil dua kali. save_to_db: default False -- ringkasan hanya dipakai
+    untuk PDF ini, tidak otomatis ditulis ke tabel executive_summaries."""
+    try:
+        df = db_service.get_latest_scraped_data(limit=1000)
+    except DatabaseConnectionError as e:
+        return None, f"Gagal terhubung ke database (bukan 'data kosong'): {e}"
+
+    if df.empty:
+        return None, "Data kosong."
+    df_kw = df[df["kata_kunci"] == keyword] if "kata_kunci" in df.columns else df
+    if df_kw.empty:
+        return None, f"Tidak ada data untuk keyword '{keyword}'."
+
+    articles = df_kw.to_dict(orient="records")
+    try:
+        pdf_bytes = news_summary_service.create_pdf_bytes(
+            keyword, articles, summary=summary, save_to_db=save_to_db
+        )
         return pdf_bytes, None
     except Exception as e:
-        return None, f"Gagal membangun PDF executive summary: {e}"
+        return None, f"Gagal membangun PDF ringkasan berita: {e}"
 
 
 # ---- dashboard.py -----------------------------------------------------------
@@ -242,36 +269,36 @@ def _load_social_posts_for_keyword(keyword: str) -> tuple[Optional[list[dict]], 
     return df_kw.to_dict(orient="records"), None
 
 
-def generate_social_executive_summary(keyword: str) -> tuple[Optional[dict], list[dict], Optional[str]]:
-    """Returns (brief, posts, error). Membuat (dan meng-cache) Executive Brief AI
-    dari post media sosial yang tersimpan untuk suatu keyword, TANPA merender
-    PDF -- dipakai untuk menampilkan ringkasan naratif langsung di halaman."""
+def generate_social_summary(keyword: str) -> tuple[Optional[dict], list[dict], Optional[str]]:
+    """Returns (summary, posts, error). Membuat Ringkasan Berita naratif dari
+    post media sosial yang tersimpan untuk suatu keyword, TANPA merender PDF --
+    dipakai untuk menampilkan ringkasan langsung di halaman."""
     posts, err = _load_social_posts_for_keyword(keyword)
     if err:
         return None, [], err
     try:
-        brief = executive_summary_service.generate_executive_summary(keyword, posts)
-        return brief, posts, None
+        summary = news_summary_service.generate_summary(keyword, posts)
+        return summary, posts, None
     except Exception as e:
-        return None, posts, f"Gagal membangun ringkasan AI sosial: {e}"
+        return None, posts, f"Gagal membangun ringkasan sosial: {e}"
 
 
 def generate_social_summary_pdf(
-    keyword: str, brief: Optional[dict] = None, posts: Optional[list[dict]] = None
+    keyword: str, summary: Optional[dict] = None, posts: Optional[list[dict]] = None
 ) -> tuple[Optional[bytes], Optional[str]]:
-    """Returns (pdf_bytes, error). Creates an executive summary PDF for social media
-    posts grouped by keyword. Pass `brief`/`posts` yang sudah dihasilkan sebelumnya
-    (mis. dari generate_social_executive_summary) supaya AI tidak dipanggil dua kali."""
+    """Returns (pdf_bytes, error). Ringkasan Berita PDF untuk post media sosial
+    per keyword. Pass `summary`/`posts` yang sudah dihasilkan sebelumnya (mis.
+    dari generate_social_summary) supaya AI tidak dipanggil dua kali."""
     if posts is None:
         posts, err = _load_social_posts_for_keyword(keyword)
         if err:
             return None, err
 
     try:
-        pdf_bytes = executive_summary_service.create_pdf_bytes(keyword, posts, brief=brief)
+        pdf_bytes = news_summary_service.create_pdf_bytes(keyword, posts, summary=summary)
         return pdf_bytes, None
     except Exception as e:
-        return None, f"Gagal membangun PDF executive summary sosial: {e}"
+        return None, f"Gagal membangun PDF ringkasan sosial: {e}"
 
 
 # ---- Fenomena.py (AI Investigator) -----------------------------------------
@@ -289,7 +316,7 @@ def generate_decision_brief_pdf(
     involved, so charts and the Insights section are simply omitted by
     generate_pdf_report() when there's no article DataFrame.
 
-    This reuses the exact same renderer as generate_summary_pdf() /
+    This reuses the exact same renderer as generate_news_summary_pdf() /
     generate_social_summary_pdf(); previously nothing called it for the
     recursive investigator, so pages/3_Fenomena.py showed a permanently
     disabled button instead.

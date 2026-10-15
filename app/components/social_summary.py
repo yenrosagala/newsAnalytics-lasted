@@ -1,7 +1,7 @@
 """
 Ringkasan cepat (non-AI) hasil Social Media Scraper.
 
-Berbeda dari executive_summary_service (yang memanggil AI dan perlu waktu),
+Berbeda dari news_summary_service (yang memanggil AI dan perlu waktu),
 komponen ini murni statistik deskriptif dari post yang BARU SAJA diambil --
 distribusi platform, kontributor teratas, dan snapshot topik dari kata yang
 paling sering muncul -- sehingga pengguna langsung dapat gambaran begitu
@@ -17,6 +17,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from app.core.theme import CHART_LAYOUT, GRADIENT
+
 _STOPWORDS = {
     "yang", "dari", "dengan", "dan", "ke", "di", "pada", "untuk", "atau",
     "ini", "itu", "juga", "sebagai", "oleh", "karena", "saat", "adalah",
@@ -26,11 +28,7 @@ _STOPWORDS = {
     "was", "have", "has", "not", "but", "from", "just", "will", "https",
 }
 
-_CHART_LAYOUT = dict(
-    template="plotly_white", paper_bgcolor="rgba(0,0,0,0)",
-    font_color="#1a2233", title_font_color="#1a2233",
-    margin=dict(t=40, b=10, l=10, r=10), showlegend=False,
-)
+_CHART_LAYOUT = {**CHART_LAYOUT, "showlegend": False, "margin": dict(t=40, b=10, l=10, r=10)}
 
 
 def _top_keywords(contents: pd.Series, max_keywords: int = 8) -> List[Tuple[str, int]]:
@@ -78,7 +76,7 @@ def render_social_summary(posts_df: pd.DataFrame) -> None:
             fig = px.bar(
                 platform_counts, x="Platform", y="Jumlah",
                 title="Distribusi Post per Platform",
-                color="Jumlah", color_continuous_scale=["#bcd6f2", "#2563eb"],
+                color="Jumlah", color_continuous_scale=GRADIENT,
             )
             fig.update_layout(**_CHART_LAYOUT)
             st.plotly_chart(fig, width='stretch')
@@ -88,7 +86,7 @@ def render_social_summary(posts_df: pd.DataFrame) -> None:
             fig = px.bar(
                 top_authors, x="Jumlah Post", y="Akun", orientation="h",
                 title="Kontributor Teratas",
-                color="Jumlah Post", color_continuous_scale=["#bcd6f2", "#2563eb"],
+                color="Jumlah Post", color_continuous_scale=GRADIENT,
             )
             fig.update_layout(**_CHART_LAYOUT, yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig, width='stretch')

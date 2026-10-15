@@ -197,7 +197,7 @@ class AIService:
             headers["X-Title"] = self.openrouter_app_name
         return headers
 
-    def _call_openrouter(self, prompt: str, force_json: bool = False, reasoning: bool = False, system_prompt: str = None) -> str:
+    def _call_openrouter(self, prompt: str, force_json: bool = False, system_prompt: str = None) -> str:
         if not self.api_keys:
             raise Exception("OpenRouter API key belum terkonfigurasi.")
         api_key = self.api_keys[self.active_index]
@@ -220,20 +220,13 @@ class AIService:
             # jelas (instruksi vs data-yang-dianalisis) dibanding menumpuk
             # semuanya ke satu blok "user" -- lihat _build_system_message().
             "messages": _build_messages(prompt, system_prompt, force_json),
-            # GLM-5.2 adalah reasoning model -- dokumentasi resminya default ke
-            # thinking ENABLED + reasoning_effort "max" di setiap contoh. Untuk
-            # tugas ekstraksi terstruktur (rangkuman, causes, next_keywords,
-            # decision brief) yang dipakai app ini, thinking mode HANYA
-            # menambah latensi tanpa menambah kualitas -- 1 investigasi AI
-            # Investigator = sampai 6 panggilan berurutan, jadi kalau tiap
-            # panggilan diam-diam "berpikir" beberapa puluh detik, totalnya
-            # berasa "tidak selesai-selesai". Default-kan MATI, dan biarkan
-            # pemanggil yang benar-benar butuh reasoning mendalam nyalakan
-            # lewat parameter `reasoning=True`.
-            "thinking": {"type": "enabled" if reasoning else "disabled"},
+            # GLM-5.2 adalah reasoning model yang default-nya thinking ENABLED
+            # + reasoning_effort "max". Untuk tugas ekstraksi terstruktur
+            # (rangkuman, causes, next_keywords, decision brief) yang dipakai
+            # app ini, thinking HANYA menambah latensi tanpa menambah kualitas
+            # -- 1 investigasi = sampai 6 panggilan berurutan. Matikan.
+            "thinking": {"type": "disabled"},
         }
-        if reasoning:
-            payload["reasoning_effort"] = "max"
         if force_json:
             # Format response_format OpenAI-compatible -- GLM-5.2 mendukung
             # Structured Output sesuai dokumentasi Z.ai.
@@ -421,15 +414,9 @@ class AIService:
                 "detail": f"OpenRouter tidak dikonfigurasi & Ollama tidak terjangkau di {self.ollama_base_url} ({e})",
             }
 
-    def generate(self, prompt: str, force_json: bool = False, reasoning: bool = False, system_prompt: str = None) -> str:
+    def generate(self, prompt: str, force_json: bool = False, system_prompt: str = None) -> str:
         """OpenRouter (GLM-5.2) dulu sebagai otak utama, fallback ke Ollama
         lokal HANYA kalau OpenRouter gagal total/tidak terkonfigurasi.
-
-        `reasoning=False` (default) mematikan thinking mode GLM-5.2 -- cocok
-        untuk tugas ekstraksi terstruktur yang dipakai app ini (rangkuman,
-        causes, decision brief). Set `reasoning=True` di titik panggil kalau
-        suatu saat butuh penalaran berlapis yang sungguhan (jarang perlu di
-        app ini).
 
         `system_prompt`: instruksi TETAP (opsional) yang dikirim sebagai
         pesan role "system", terpisah dari `prompt` (data/korpus dinamis
@@ -442,7 +429,7 @@ class AIService:
             attempts = 0
             while attempts < len(self.api_keys):
                 try:
-                    return self._call_openrouter(prompt, force_json=force_json, reasoning=reasoning, system_prompt=system_prompt)
+                    return self._call_openrouter(prompt, force_json=force_json, system_prompt=system_prompt)
                 except Exception as e:
                     last_error = e
                     logger.warning(f"OpenRouter gagal ({e}), merotasi key...")
@@ -458,34 +445,6 @@ class AIService:
             raise Exception(
                 f"OpenRouter gagal/tidak terkonfigurasi dan fallback Ollama lokal juga gagal: {ollama_err}"
             )
-
-    def analyze_article(self, full_text: str) -> dict:
-        """Satu kali request untuk mendapatkan Rangkuman & Sentimen sekaligus."""
-        if not full_text or len(full_text.strip()) < 150:
-            return {"summary": "Konten berita terlalu pendek untuk dirangkum.", "sentiment": "Neutral"}
-
-        prompt = f"""Bertindaklah sebagai analis media profesional. Analisis berita berikut:
-
-{full_text}
-
-Berikan hasil persis dalam format berikut (tanpa basa-basi):
-SENTIMEN: [Isi dengan Positif, Negatif, atau Netral]
-RANGKUMAN:
-- [Poin 1]
-- [Poin 2]
-- [Poin 3]"""
-
-        try:
-            text_res = self.generate(prompt)
-            sentiment_label = "Neutral"
-            if "SENTIMEN: Positif" in text_res or "SENTIMEN: POSITIF" in text_res:
-                sentiment_label = "Positive"
-            elif "SENTIMEN: Negatif" in text_res or "SENTIMEN: NEGATIF" in text_res:
-                sentiment_label = "Negative"
-            return {"summary": text_res, "sentiment": sentiment_label}
-        except Exception as e:
-            logger.error(f"Gagal memproses AI: {str(e)}")
-            return {"summary": f"Gagal memproses rangkuman AI: {str(e)}", "sentiment": "Neutral"}
 
 
 # Singleton instance

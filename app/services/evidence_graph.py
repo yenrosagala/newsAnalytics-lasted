@@ -10,22 +10,7 @@ Dipakai oleh pages/3_Fenomena.py (AI Investigator).
 """
 from typing import Dict
 
-TIER_COLORS = {
-    "Tinggi": "#10b981",   # hijau
-    "Sedang": "#f59e0b",   # amber
-    "Rendah": "#ef4444",   # merah/coral
-}
-
-_DARK_LAYOUT = dict(
-    template="plotly_white",
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font_color="#1a2233",
-    title_font_color="#1a2233",
-    margin=dict(t=48, b=10, l=10, r=10),
-    showlegend=True,
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-)
+from app.core.theme import CHART_LAYOUT, TIER_COLORS
 
 
 def _truncate(text: str, max_len: int = 55) -> str:
@@ -160,6 +145,6 @@ def build_evidence_graph_fig(graph_data: Dict):
         yaxis=dict(visible=False),
         height=max(420, 260 * (max((n["depth"] for n in nodes), default=1) + 1)),
         hovermode="closest",
-        **_DARK_LAYOUT,
+        **CHART_LAYOUT,
     )
     return fig

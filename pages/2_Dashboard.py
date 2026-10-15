@@ -3,22 +3,15 @@ import pandas as pd
 from datetime import datetime
 import plotly.express as px
 
-from app.core.config import Config
 from app.core.logger import setup_logger
-from app.core.auth import render_auth_sidebar
-from app.components.sidebar import load_custom_css, render_app_sidebar
 from app import api_bridge
 from app.services.database_service import DatabaseConnectionError
+from app.core.theme import ACCENT, CHART_LAYOUT, GRADIENT, SENTIMENT_COLORS, sentiment_color
+from app.core.page import setup_page
 
-config = Config()
 logger = setup_logger("page_dashboard")
 
-# Konfigurasi Halaman[cite: 16]
-st.set_page_config(page_title="Analytics", layout="wide", page_icon="📊")
-
-load_custom_css()
-render_app_sidebar(active_page="pages/2_Dashboard.py")
-render_auth_sidebar()
+setup_page("Analytics", "📊", "pages/2_Dashboard.py")
 
 st.markdown("# 📊 Analytics Dashboard")
 st.caption("Dashboard and Admin Management (Terintegrasi API)")
@@ -107,26 +100,9 @@ with tab_overview:
         st.markdown("### 📊 Grafik Analitik")
 
         def _sentiment_color_map(series):
-            palette = {}
-            for val in series.dropna().unique():
-                v = str(val).strip().lower()
-                if v.startswith("pos"):
-                    palette[val] = "#10b981"
-                elif v.startswith("neg"):
-                    palette[val] = "#ef4444"
-                else:
-                    palette[val] = "#64748b"
-            return palette
+            return {val: sentiment_color(val) for val in series.dropna().unique()}
 
-        _dark_chart_layout = dict(
-            template="plotly_white",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font_color="#1a2233",
-            title_font_color="#1a2233",
-            margin=dict(t=40, b=20, l=20, r=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
+        _dark_chart_layout = {**CHART_LAYOUT, "margin": dict(t=40, b=20, l=20, r=20)}
 
         col_chart1, col_chart2 = st.columns(2)
         with col_chart1:
@@ -144,7 +120,7 @@ with tab_overview:
                 top_media_chart.columns = ['Media', 'Jumlah']
                 fig_bar = px.bar(
                     top_media_chart.head(8), x='Media', y='Jumlah', title="Top Portal Media",
-                    color='Jumlah', color_continuous_scale=["#bcd6f2", "#2563eb"],
+                    color='Jumlah', color_continuous_scale=GRADIENT,
                 )
                 fig_bar.update_layout(**_dark_chart_layout)
                 st.plotly_chart(fig_bar, width='stretch')
@@ -183,12 +159,7 @@ with tab_spatial:
             spatial_kpi3.metric("📰 Total Sebutan Lokasi", f"{int(hotspots_df['mention_count'].sum()):,}")
 
             def _sentiment_marker_color(val):
-                v = str(val).strip().lower() if val else ""
-                if v.startswith("pos"):
-                    return "#10b981"
-                if v.startswith("neg"):
-                    return "#ef4444"
-                return "#2563eb"
+                return sentiment_color(val, neutral=ACCENT)
 
             hotspots_df["marker_color"] = hotspots_df["dominant_sentiment"].apply(_sentiment_marker_color)
 
@@ -199,8 +170,7 @@ with tab_spatial:
                 hover_name="location",
                 hover_data={"mention_count": True, "dominant_sentiment": True, "lat": False, "lon": False},
                 color="dominant_sentiment",
-                color_discrete_map={"Positive": "#10b981", "Negative": "#ef4444", "Neutral": "#64748b",
-                                     "POSITIVE": "#10b981", "NEGATIVE": "#ef4444", "NEUTRAL": "#64748b"},
+                color_discrete_map=SENTIMENT_COLORS,
                 projection="natural earth",
                 title="Sebaran Hotspot Berita di Indonesia",
             )
@@ -212,12 +182,7 @@ with tab_spatial:
                 showocean=True, oceancolor="#f6f8fb",
                 bgcolor="rgba(0,0,0,0)",
             )
-            fig_map.update_layout(
-                template="plotly_white", paper_bgcolor="rgba(0,0,0,0)",
-                font_color="#1a2233", title_font_color="#1a2233",
-                margin=dict(t=40, b=10, l=10, r=10), height=520,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            )
+            fig_map.update_layout(**CHART_LAYOUT, margin=dict(t=40, b=10, l=10, r=10), height=520)
             st.plotly_chart(fig_map, width='stretch')
 
             st.markdown("#### 🏆 Ranking Hotspot")

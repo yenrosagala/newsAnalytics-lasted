@@ -5,19 +5,21 @@ Struktur & parsing bersama untuk "Executive Brief" bergaya Decision
 Intelligence: Situation, Risks, Impact, Recommendations (S-R-I-R).
 
 Dipakai oleh:
-- pages/1_Scraping.py (ringkasan eksekutif per-keyword)
-- pages/3_Fenomena.py / AI Investigator (ringkasan eksekutif hasil investigasi)
-- app/services/pdf_service.py & app/services/report_service.py (render ke PDF)
+- pages/3_Fenomena.py / AI Investigator (Executive Intelligence Brief hasil investigasi)
+- app/services/pdf_service.py (render ke PDF)
 - app/components/decision_brief_view.py (render ke Streamlit UI)
 
-Kenapa dipusatkan di sini: dua halaman tsb tadinya masing-masing punya
-parser JSON ad-hoc sendiri untuk ringkasan eksekutif (bentuk esai bebas).
-Sekarang keduanya memakai skema OUTPUT yang SAMA (lihat `parse_decision_brief_json`)
-supaya format & styling brief konsisten di seluruh aplikasi.
+Kenapa dipusatkan di sini: AI Investigator dan (dulu) halaman Scraping
+masing-masing punya parser JSON ad-hoc sendiri. Sekarang brief S-R-I-R
+memakai skema OUTPUT yang SAMA (lihat `parse_decision_brief_json`) supaya
+format & styling konsisten. Halaman Scraping tidak lagi memakai brief S-R-I-R
+-- kini ia memakai Ringkasan Berita naratif (app/services/news_summary_service.py).
 """
 import json
 import re
 from typing import Dict, List, Optional
+
+from app.core.theme import SEVERITY_COLORS
 
 try:
     from app.core.logger import get_logger
@@ -27,11 +29,6 @@ except Exception:  # pragma: no cover
     logger = logging.getLogger("DecisionBrief")
 
 VALID_SEVERITY_TIERS = ("Tinggi", "Sedang", "Rendah")
-SEVERITY_COLORS = {
-    "Tinggi": "#ef4444",   # merah -- risiko/urgensi tinggi
-    "Sedang": "#f59e0b",   # amber
-    "Rendah": "#10b981",   # hijau -- risiko rendah
-}
 
 EMPTY_BRIEF: Dict = {
     "title": "",

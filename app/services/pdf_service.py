@@ -2,8 +2,6 @@ import io
 from datetime import datetime
 from typing import List, Optional, Tuple
 from fpdf import FPDF
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 def fig_to_png_buffer(fig, width: int = 900, height: int = 600, scale: int = 2) -> Optional[io.BytesIO]:
@@ -38,6 +36,8 @@ def clean_text(text):
 def generate_pdf_report(
     filtered_df, insights, target_keyword, date_range_str, t_media_str, brief,
     extra_graphs: Optional[List[Tuple[str, io.BytesIO]]] = None,
+    brief_section_title: str = "Executive Brief",
+    plain_body: bool = False,
 ):
     """
     Fungsi utilitas murni untuk membuat file PDF berdasarkan data yang dikirim dari UI.
@@ -47,13 +47,24 @@ def generate_pdf_report(
     `app.services.decision_brief.parse_decision_brief_json` / `deserialize_brief`,
     dengan keys: title, situation, risks (list of {risk,severity,rationale}),
     impact, recommendations (list of str), bibliography (str).
+    Untuk Ringkasan Berita, cukup isi `title` + `situation` (esai naratif).
 
     `extra_graphs`: daftar opsional (heading, image_buffer) untuk grafik yang
     dirender di luar fungsi ini (mis. Evidence Graph / Peta Aktor / Spatial
     Intelligence dari Plotly, dirasterisasi lewat `fig_to_png_buffer()`).
     Masing-masing ditampilkan full-width satu per halaman/section, setelah
     seksi grafik sentimen/media bawaan.
+
+    `brief_section_title` / `plain_body`: dipakai Ringkasan Berita -- ganti
+    judul seksi (default "Executive Brief") dan lewati subjudul S-R-I-R,
+    tulis `situation` sebagai esai naratif polos.
     """
+    # ponytail: import matplotlib+seaborn di sini (bukan top-level) supaya
+    # setiap page load tidak menanggung ~2 s import stack plotting yang baru
+    # dipakai saat PDF benar-benar diminta.
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
     # Set style global untuk grafik biar rapi
     plt.style.use('ggplot')
     
@@ -231,11 +242,12 @@ def generate_pdf_report(
     pdf.set_font("Helvetica", "B", 12)
     pdf.set_text_color(0, 100, 180)
     section_num += 1
-    pdf.cell(170, 8, f"{section_num}. Executive Brief", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(170, 8, f"{section_num}. {clean_text(brief_section_title)}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
 
     if brief.get("situation"):
-        _write_subheading("Situation")
+        if not plain_body:
+            _write_subheading("Situation")
         _write_paragraphs(brief["situation"])
 
     if brief.get("risks"):
@@ -274,7 +286,8 @@ def generate_pdf_report(
     if not any([brief.get("situation"), brief.get("risks"), brief.get("impact"), brief.get("recommendations")]):
         pdf.set_font("Helvetica", "I", 10)
         pdf.set_text_color(120, 120, 120)
-        pdf.multi_cell(170, 6, "Executive brief tidak tersedia untuk laporan ini.", new_x="LMARGIN", new_y="NEXT")
+        fallback = "Ringkasan berita tidak tersedia untuk laporan ini." if plain_body else "Executive brief tidak tersedia untuk laporan ini."
+        pdf.multi_cell(170, 6, fallback, new_x="LMARGIN", new_y="NEXT")
 
     # --- SEKSI 4: DAFTAR PUSTAKA NUMERIK DI HALAMAN AKHIR ---
     if brief.get("bibliography"):

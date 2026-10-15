@@ -11,6 +11,8 @@ import pandas as pd
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from app.core.theme import CHART_LAYOUT
+
 try:
     from app.core.logger import get_logger
     logger = get_logger("ClusteringService")
@@ -170,12 +172,7 @@ class ClusteringService:
         )
         fig.update_traces(marker=dict(size=13, line=dict(width=1, color="white")))
         fig.update_layout(
-            template="plotly_white",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font_color="#1a2233",
-            title_font_color="#1a2233",
-            margin=dict(t=48, b=10, l=10, r=10),
+            **CHART_LAYOUT,
             yaxis_title="Cerita",
             xaxis_title="Tanggal",
             showlegend=color_col is not None,
