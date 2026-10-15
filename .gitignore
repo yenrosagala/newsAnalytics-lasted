@@ -4,3 +4,8 @@ __pycache__/
 *$py.class
 .streamlit/secrets.toml
 D:\New Project\newsAnalytics-lasted\app.log
+
+# Virtual environments
+venv/
+.venv/
+env/
