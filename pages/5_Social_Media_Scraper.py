@@ -82,7 +82,7 @@ if submit_social:
                     st.dataframe(posts_df, width='stretch')
                     st.download_button(
                         "📄 Download CSV",
-                        data=posts_df.to_csv(index=False).encode("utf-8"),
+                        data=posts_df.to_csv(index=False, sep=";").encode("utf-8-sig"),
                         file_name=f"social_{platform}_{target.strip('@')}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                         mime="text/csv",
                     )

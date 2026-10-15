@@ -25,11 +25,41 @@ from app.core.theme import SENTIMENT_COLORS
 
 logger = get_logger("NewsSummaryService")
 
-MAX_ARTICLES_FOR_SUMMARY = 15
-MAX_PROMPT_CHARS = 28000
-MAX_ARTICLE_TEXT_CHARS = 2500
+MAX_ARTICLES_FOR_SUMMARY = 50
+MAX_PROMPT_CHARS = 200000
+MAX_ARTICLE_TEXT_CHARS = 10000
+MIN_SUMMARY_CHARS = 200  # di bawah ini dianggap keluaran rusak (mis. "User Safety: safe") -> ulangi
+MAX_SUMMARY_ATTEMPTS = 3
 
 SUMMARY_SECTION_TITLE = "Ringkasan Berita"
+
+# Kata fungsi umum untuk menebak bahasa keluaran AI tanpa library deteksi
+# bahasa. Model gratis kadang mengabaikan instruksi "WAJIB Bahasa Indonesia".
+_ID_STOPWORDS = {
+    "yang", "dan", "di", "ke", "dari", "dengan", "untuk", "pada", "tidak",
+    "ini", "itu", "adalah", "akan", "juga", "karena", "sebagai", "oleh",
+    "dalam", "atau", "tersebut", "lebih", "sudah", "bisa", "telah", "para",
+    "sehingga", "namun", "saat", "hingga", "antara", "masih",
+}
+_EN_STOPWORDS = {
+    "the", "and", "of", "to", "in", "is", "was", "with", "that", "for", "on",
+    "as", "are", "were", "this", "it", "from", "by", "at", "has", "have",
+    "but", "not", "be", "been", "its", "their", "which", "while", "these",
+}
+
+
+def _looks_indonesian(text: str) -> bool:
+    """True kalau teks condong Bahasa Indonesia. Kalau tak ada kata fungsi yang
+    dikenali sama sekali, jangan menghukum (anggap True) supaya tidak salah
+    mengulang hanya karena kosakata yang tidak terduga."""
+    tokens = re.findall(r"[a-zA-Z]+", (text or "").lower())
+    if not tokens:
+        return False
+    id_hits = sum(1 for t in tokens if t in _ID_STOPWORDS)
+    en_hits = sum(1 for t in tokens if t in _EN_STOPWORDS)
+    if id_hits == 0 and en_hits == 0:
+        return True
+    return id_hits >= en_hits
 
 
 def _sanitize_article_block(article: dict, index: int) -> str:
@@ -65,16 +95,56 @@ def _sanitize_article_block(article: dict, index: int) -> str:
     )
 
 
-def _build_concatenated_content(articles: List[dict]) -> str:
-    blocks = []
+def _select_articles_for_prompt(articles: List[dict]) -> List[dict]:
+    """Artikel yang benar-benar masuk ke prompt: dibatasi jumlah artikel DAN
+    total panjang karakter. Dipakai bersama oleh _build_concatenated_content()
+    dan _build_bibliography() supaya nomor sitasi [n] konsisten dengan daftar
+    pustaka yang ditampilkan."""
+    selected = []
     total_len = 0
     for idx, article in enumerate(articles[:MAX_ARTICLES_FOR_SUMMARY], start=1):
         block = _sanitize_article_block(article, idx)
         if total_len + len(block) > MAX_PROMPT_CHARS:
             break
-        blocks.append(block)
+        selected.append(article)
         total_len += len(block)
+    return selected
+
+
+def _build_concatenated_content(articles: List[dict]) -> str:
+    blocks = [
+        _sanitize_article_block(article, idx)
+        for idx, article in enumerate(_select_articles_for_prompt(articles), start=1)
+    ]
     return "\n---\n".join(blocks)
+
+
+def _build_bibliography(articles: List[dict]) -> List[dict]:
+    """Daftar sumber bernomor [n] yang PERSIS cocok dengan blok bernomor yang
+    dikirim ke model, supaya sitasi [n] di esai merujuk sumber yang benar."""
+    bibliography = []
+    for idx, article in enumerate(_select_articles_for_prompt(articles), start=1):
+        bibliography.append({
+            "n": idx,
+            "media": article.get("media") or article.get("source") or "Unknown",
+            "title": article.get("title") or article.get("judul") or "[Tanpa Judul]",
+            "date": article.get("waktu_tampilan") or article.get("published_date") or "",
+            "url": article.get("url") or article.get("link") or "",
+        })
+    return bibliography
+
+
+def _format_bibliography(bibliography: List[dict]) -> str:
+    """Format teks daftar pustaka bernomor untuk PDF (satu baris per sumber)."""
+    lines = []
+    for entry in bibliography:
+        label = f"[{entry.get('n')}] {entry.get('media') or '-'} -- {entry.get('title') or '-'}"
+        if entry.get("date"):
+            label += f" ({entry['date']})"
+        if entry.get("url"):
+            label += f". {entry['url']}"
+        lines.append(label)
+    return "\n".join(lines)
 
 
 def _get_date_range_str(articles: List[dict]) -> str:
@@ -137,9 +207,11 @@ def _extract_topic_keywords(articles: List[dict], max_keywords: int = 5) -> List
 
 
 def _parse_summary_json(raw, fallback_title: str) -> dict:
-    """Ambil {title, summary} dari keluaran AI yang harusnya JSON. Toleran
-    terhadap code fence / teks pembungkus; kalau gagal, pakai seluruh teks
-    sebagai summary supaya pengguna tetap mendapat sesuatu yang berguna."""
+    """Ambil {title, summary} dari keluaran AI. Toleran terhadap: JSON valid,
+    JSON dibungkus code fence/teks, ATAU prosa markdown biasa (model kadang
+    mengabaikan permintaan "JSON saja" -- tanpa force_json, response_format
+    json_object ditolak sebagian model/endpoint). Kalau teks diawali heading
+    "# ...", heading dipakai sebagai judul dan sisanya sebagai summary."""
     text = raw if isinstance(raw, str) else str(raw or "")
     text = text.strip()
     start, end = text.find("{"), text.rfind("}")
@@ -152,6 +224,13 @@ def _parse_summary_json(raw, fallback_title: str) -> dict:
                 return {"title": title or fallback_title, "summary": summary}
         except Exception:
             pass
+    # Fallback prosa/markdown: pakai heading pertama sebagai judul.
+    m = re.match(r"^#{1,6}\s*(.+?)\s*\n", text + "\n")
+    if m:
+        heading = re.sub(r"^Ringkasan Berita\s*[:\-]\s*", "", m.group(1).strip(), flags=re.I).strip()
+        body = text[m.end():].strip()
+        if body:
+            return {"title": heading or fallback_title, "summary": body}
     return {"title": fallback_title, "summary": text}
 
 
@@ -188,6 +267,7 @@ class NewsSummaryService:
             return {
                 "title": f"Ringkasan Berita {keyword}",
                 "summary": "Tidak ada artikel yang tersedia untuk kata kunci ini.",
+                "bibliography": [],
             }
 
         date_range_str = _get_date_range_str(articles)
@@ -211,15 +291,40 @@ class NewsSummaryService:
             catatan_regenerate=note,
         )
 
-        try:
-            raw = ai_service.generate(user_prompt, force_json=True, system_prompt=system_prompt)
-            summary = _parse_summary_json(raw, fallback_title=f"Ringkasan Berita {keyword}")
-        except Exception as e:
-            logger.error(f"Gagal membuat ringkasan berita AI: {e}")
+        summary = None
+        fallback_candidate = None  # esai valid tapi (mungkin) bukan Bahasa Indonesia
+        for attempt in range(1, MAX_SUMMARY_ATTEMPTS + 1):
+            try:
+                raw = ai_service.generate(user_prompt, force_json=False, system_prompt=system_prompt)
+            except Exception as e:
+                logger.warning(f"Percobaan {attempt}: gagal memanggil AI ({e}).")
+                continue
+            candidate = _parse_summary_json(raw, fallback_title=f"Ringkasan Berita {keyword}")
+            body = (candidate.get("summary") or "").strip()
+            # Model gratis kadang mengembalikan keluaran rusak (mis. label
+            # klasifikasi "User Safety: safe") alih-alih esai. Esai valid jauh
+            # lebih panjang dari MIN_SUMMARY_CHARS -> deteksi & ulangi.
+            if len(body) < MIN_SUMMARY_CHARS:
+                logger.warning(f"Percobaan {attempt}: keluaran AI tidak valid/terlalu pendek ({len(body)} char), mengulang.")
+                continue
+            if fallback_candidate is None:
+                fallback_candidate = candidate
+            if _looks_indonesian(body):
+                summary = candidate
+                break
+            logger.warning(f"Percobaan {attempt}: ringkasan terdeteksi bukan Bahasa Indonesia, mengulang.")
+
+        if summary is None:
+            # Pakai esai valid non-Indonesia daripada jatuh ke ringkasan offline.
+            summary = fallback_candidate
+        if summary is None:
+            logger.error("Ringkasan berita AI gagal setelah semua percobaan; memakai ringkasan offline.")
             summary = _build_offline_summary(keyword, articles, date_range_str, top_media_str)
 
         if not summary.get("title"):
             summary["title"] = f"Ringkasan Berita {keyword}"
+
+        summary["bibliography"] = _build_bibliography(articles)
 
         if save_to_db:
             try:
@@ -264,7 +369,7 @@ class NewsSummaryService:
             "risks": [],
             "impact": "",
             "recommendations": [],
-            "bibliography": "",
+            "bibliography": _format_bibliography(summary.get("bibliography") or []),
         }
 
         extra_graphs = []

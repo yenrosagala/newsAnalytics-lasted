@@ -147,6 +147,21 @@ with tab_scrape:
                 summary, summary_err = api_bridge.generate_news_summary(active_keyword_to_summarize)
             if summary:
                 render_news_summary(summary)
+                try:
+                    df_topic = pd.DataFrame(api_bridge.get_articles(limit=1000))
+                    if "kata_kunci" in df_topic.columns:
+                        df_topic = df_topic[df_topic["kata_kunci"] == active_keyword_to_summarize]
+                    if not df_topic.empty:
+                        st.download_button(
+                            label=f"⬇️ Download Semua Berita '{active_keyword_to_summarize}' ({len(df_topic)} artikel) sebagai CSV",
+                            data=df_topic.to_csv(index=False, sep=";").encode("utf-8-sig"),
+                            file_name=f"Berita_{active_keyword_to_summarize.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv",
+                            width='stretch',
+                        )
+                except Exception as e:
+                    st.error(f"Gagal memuat berita untuk diunduh: {e}")
+
                 pdf_bytes, err = api_bridge.generate_news_summary_pdf(
                     active_keyword_to_summarize,
                     summary=summary,
