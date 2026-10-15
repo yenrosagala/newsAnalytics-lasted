@@ -217,6 +217,27 @@ class DatabaseService:
             logger.warning(f"Tidak bisa mengambil executive summary terbaru (cek tabel 'executive_summaries'): {e}")
             return None
 
+    def get_all_executive_summaries(self, limit: int = 200) -> list:
+        """Mengambil SEMUA ringkasan berita tersimpan (tabel executive_summaries)
+        terbaru dulu -- untuk tab 'Daftar Ringkasan Berita Tersimpan (Database)'
+        di halaman Scraping. Raise DatabaseConnectionError kalau query gagal, agar
+        UI bisa membedakan 'belum ada data' dari 'koneksi bermasalah'."""
+        try:
+            client = self._get_client()
+            response = (
+                client.table("executive_summaries")
+                .select("kata_kunci, rentang_waktu, hasil_summary, created_at")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            logger.error(f"Error fetching executive summaries: {e}")
+            raise DatabaseConnectionError(
+                f"Gagal mengambil daftar ringkasan tersimpan dari Supabase: {e}"
+            ) from e
+
     def save_executive_summary_to_db(self, kata_kunci: str, rentang_waktu: str, hasil_summary: str) -> bool:
         """Menyimpan hasil executive summary AI agar bisa dipakai ulang (cache)."""
         try:

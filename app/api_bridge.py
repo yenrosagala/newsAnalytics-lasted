@@ -14,6 +14,7 @@ Fix: call the same service-layer functions the FastAPI endpoints used to
 call, directly, in-process. No HTTP, no second server, same business logic.
 Each function below mirrors one FastAPI route 1:1.
 """
+import json
 from typing import Optional
 
 from app.core.logger import get_logger
@@ -106,6 +107,45 @@ def generate_news_summary_pdf(
         return pdf_bytes, None
     except Exception as e:
         return None, f"Gagal membangun PDF ringkasan berita: {e}"
+
+
+# ---- Saved executive summaries (Riwayat Ringkasan) ----------------------------
+def _parse_stored_summary(raw) -> dict:
+    obj = raw
+    if isinstance(raw, str):
+        try:
+            obj = json.loads(raw)
+        except Exception:
+            obj = None
+    if isinstance(obj, dict):
+        bibliography = obj.get("bibliography")
+        return {
+            "title": obj.get("title") or obj.get("judul") or "",
+            "summary": obj.get("summary") or obj.get("situation") or "",
+            "bibliography": bibliography if isinstance(bibliography, list) else [],
+        }
+    return {"title": "", "summary": str(raw or ""), "bibliography": []}
+
+
+def _stored_summary_to_dict(row: dict) -> dict:
+    parsed = _parse_stored_summary(row.get("hasil_summary"))
+    created = row.get("created_at")
+    if created:
+        saved_at = str(created)[:16].replace("T", " ")
+    else:
+        saved_at = None
+    parsed["keyword"] = row.get("kata_kunci")
+    parsed["date_range"] = row.get("rentang_waktu")
+    parsed["saved_at"] = saved_at
+    return parsed
+
+
+def get_saved_summaries(limit: int = 200) -> list:
+    """Daftar Ringkasan Berita yang tersimpan di tabel executive_summaries
+    (terbaru dulu), sudah diparse jadi dict siap tampil:
+    {keyword, date_range, saved_at, title, summary, bibliography}."""
+    rows = db_service.get_all_executive_summaries(limit=limit)
+    return [_stored_summary_to_dict(r) for r in rows]
 
 
 # ---- dashboard.py -----------------------------------------------------------

@@ -189,40 +189,64 @@ with tab_scrape:
 # ==================== TAB 2: RIWAYAT RINGKASAN ====================
 with tab_history:
     st.subheader("🗄️ Daftar Ringkasan Berita Tersimpan (Database)")
-    
+    st.caption(
+        "Ringkasan berita yang disimpan permanen. Centang **💾 Simpan Ringkasan Berita ke Database** "
+        "di tab **📥 Scrape Berita** agar ringkasan tersimpan di sini."
+    )
+
+    from app.services.database_service import DatabaseConnectionError
+
+    saved_summaries, saved_error = [], None
     try:
-        df_latest = pd.DataFrame(api_bridge.get_articles(limit=500))
-        if not df_latest.empty and 'kata_kunci' in df_latest.columns:
-            unique_keywords = df_latest['kata_kunci'].dropna().unique()
-            
-            for kw in unique_keywords:
-                df_kw = df_latest[df_latest['kata_kunci'] == kw]
-                total_art = len(df_kw)
-                
-                with st.expander(f"🔑 Topik / Kata Kunci: {kw} ({total_art} Artikel Terkait)"):
-                    col_info1, col_info2 = st.columns([3, 1])
-                    with col_info1:
-                        st.markdown("**Status Dokumen:** Siap Diunduh")
-                        st.markdown(f"**Total Artikel Terkumpul:** {total_art} entri")
-                    with col_info2:
-                        if st.button(f"📥 Unduh PDF", key=f"btn_dl_{kw.replace(' ', '_')}", width='stretch'):
-                            with st.spinner(f"Memproses file PDF untuk '{kw}'..."):
-                                pdf_bytes, err = api_bridge.generate_news_summary_pdf(kw)
-                                if pdf_bytes:
-                                    st.download_button(
-                                        label=f"Klik Untuk Unduh File '{kw}'",
-                                        data=pdf_bytes,
-                                        file_name=f"Ringkasan_Berita_{kw.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                                        mime="application/pdf",
-                                        key=f"dl_action_{kw.replace(' ', '_')}",
-                                        width='stretch'
-                                    )
-                                else:
-                                    st.error(f"Gagal mendapatkan PDF: {err}")
-        else:
-            st.info("Belum ada data berita tersimpan di database.")
+        saved_summaries = api_bridge.get_saved_summaries(limit=200)
+    except DatabaseConnectionError as e:
+        saved_error = f"Gagal terhubung ke database — ini BUKAN 'belum ada data': {e}"
     except Exception as e:
-        st.error(f"Terjadi kesalahan saat memuat riwayat: {e}")
+        saved_error = f"Terjadi kesalahan saat memuat riwayat: {e}"
+
+    if saved_error:
+        st.error(saved_error)
+    elif not saved_summaries:
+        st.info(
+            "Belum ada ringkasan berita tersimpan. Jalankan scraping di tab **📥 Scrape Berita**, "
+            "lalu centang **💾 Simpan Ringkasan Berita ke Database** sebelum menekan "
+            "**🚀 Gather & Generate Summary**."
+        )
+    else:
+        col_total, col_filter = st.columns([1, 2])
+        with col_total:
+            st.metric("📚 Ringkasan Tersimpan", f"{len(saved_summaries):,}")
+        with col_filter:
+            keyword_options = sorted({s["keyword"] for s in saved_summaries if s.get("keyword")})
+            selected_keywords = st.multiselect(
+                "Filter Berdasarkan Keyword", options=keyword_options, default=[],
+                key="saved_summary_keyword_filter",
+            )
+
+        shown = [
+            s for s in saved_summaries
+            if not selected_keywords or s.get("keyword") in selected_keywords
+        ]
+        if not shown:
+            st.info("Tidak ada ringkasan untuk keyword yang dipilih.")
+
+        for item in shown:
+            n_sources = len(item.get("bibliography") or [])
+            title_disp = item.get("keyword") or "Ringkasan"
+            label = f"🗂️ {title_disp}  ·  🕒 {item.get('saved_at') or '-'}  ·  {n_sources} sumber"
+            with st.expander(label):
+                meta = []
+                if item.get("date_range"):
+                    meta.append(f"**Rentang berita:** {item['date_range']}")
+                if item.get("saved_at"):
+                    meta.append(f"**Disimpan:** {item['saved_at']} UTC")
+                if meta:
+                    st.caption("  ·  ".join(meta))
+                render_news_summary({
+                    "title": item.get("title"),
+                    "summary": item.get("summary"),
+                    "bibliography": item.get("bibliography") or [],
+                })
 
 
 # ==================== TAB 3: STORY CLUSTERING & TIMELINE ====================
