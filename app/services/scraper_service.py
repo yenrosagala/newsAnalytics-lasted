@@ -49,6 +49,16 @@ SCRAPE_BATCH_TIMEOUT_SECONDS = 90
 # per-panggilan ini memastikan satu resolve URL yang macet tidak menahan
 # thread selamanya.
 GNEWS_DECODE_TIMEOUT_SECONDS = 10
+# Jeda kecil SEBELUM tiap panggilan gnewsdecoder(). Nilai 0 (tanpa jeda)
+# membuat puluhan permintaan decode menghantam endpoint Google News nyaris
+# serentak -- Google lalu membalas gagal (status False) untuk SEMUA item
+# dalam satu batch, sehingga semuanya jatuh ke fallback URL RSS mentah.
+# Jeda ini berjalan di dalam tiap worker (tetap paralel), jadi burst-nya
+# lebih rata tanpa memperlambat batch secara berarti.
+GNEWS_DECODE_INTERVAL_SECONDS = 0.5
+# Jumlah percobaan decode per URL + jeda backoff antar percobaan.
+GNEWS_DECODE_ATTEMPTS = 3
+GNEWS_DECODE_BACKOFF_SECONDS = 1.5
 
 # Daftar user-agent alternatif untuk rotasi guna menghindari pembatasan/blokiran Cloudflare
 USER_AGENTS = [
@@ -115,13 +125,24 @@ class ScraperService:
         if not gnewsdecoder or not google_url:
             return google_url
 
-        for attempt in range(2):
+        for attempt in range(GNEWS_DECODE_ATTEMPTS):
+            # `with ThreadPoolExecutor(...)` sebelumnya TIDAK memberi timeout
+            # nyata: __exit__ memanggil shutdown(wait=True) yang justru
+            # menunggu thread menggantung, sehingga future.result(timeout=...)
+            # tidak pernah membebaskan worker tepat waktu. shutdown eksplisit
+            # dengan wait=False + cancel_futures=True memperbaiki itu.
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(gnewsdecoder, google_url, interval=0)
-                    result = future.result(timeout=GNEWS_DECODE_TIMEOUT_SECONDS)
+                future = executor.submit(
+                    gnewsdecoder, google_url, interval=GNEWS_DECODE_INTERVAL_SECONDS
+                )
+                result = future.result(timeout=GNEWS_DECODE_TIMEOUT_SECONDS)
                 if result and result.get("status") and result.get("decoded_url"):
                     return result["decoded_url"]
+                logger.warning(
+                    f"Decode URL Google News ke-{attempt+1} tidak berhasil "
+                    f"(status={result.get('status') if result else None}) untuk {google_url}."
+                )
             except concurrent.futures.TimeoutError:
                 logger.warning(
                     f"Decode URL Google News ke-{attempt+1} melewati batas waktu "
@@ -129,7 +150,10 @@ class ScraperService:
                 )
             except Exception as e:
                 logger.warning(f"Percobaan decode URL Google News ke-{attempt+1} gagal: {e}")
-                time.sleep(1)
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
+            if attempt < GNEWS_DECODE_ATTEMPTS - 1:
+                time.sleep(GNEWS_DECODE_BACKOFF_SECONDS * (attempt + 1))
         return google_url
 
     def _extract_article_metadata(self, url: str, fallback_title: str = "", fallback_desc: str = "") -> dict:
