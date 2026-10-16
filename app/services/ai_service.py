@@ -21,6 +21,13 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # memakan kuota chat-completion -- dipakai oleh check_status().
 OPENROUTER_KEY_INFO_URL = "https://openrouter.ai/api/v1/key"
 
+# --- Gemini (otak utama saat ini) ---
+# REST API resmi Google Generative Language. Key dikirim sebagai query param
+# `?key=`, model jadi bagian path. Model default bisa dioverride lewat env
+# GEMINI_MODEL (mis. "gemini-2.0-flash", "gemini-2.5-pro").
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+GEMINI_MODELS_URL = f"{GEMINI_API_BASE}/models"
+
 OLLAMA_CONNECTION_ERROR_HINT = (
     "Tidak bisa terhubung ke Ollama di {base_url}. Pastikan Ollama berjalan "
     "dan model sudah ter-pull."
@@ -78,27 +85,31 @@ def _build_messages(prompt: str, system_prompt: str = None, force_json: bool = F
 
 
 class AIService:
-    """Wrapper AI menggunakan OpenRouter (model GLM-5.2 dari Z.ai secara
-    default) sebagai otak utama.
+    """Wrapper AI dengan Gemini sebagai otak utama, OpenRouter sebagai
+    fallback kedua, dan Ollama lokal sebagai jaring pengaman paling akhir.
 
-    Sebelumnya otak utama adalah Gemini dengan fallback ke Ollama lokal.
-    Diganti ke OpenRouter karena dua masalah reliabilitas yang dialami
-    langsung: (1) Gemini sering kena limit/quota, (2) Ollama lokal dibatasi
-    kemampuan hardware (lambat/kadang gagal load model). OpenRouter dipakai
-    karena satu API key bisa merutekan ke banyak provider/model dengan
-    kapasitas jauh lebih besar daripada tier gratis Gemini, dan tidak
-    tergantung hardware lokal sama sekali.
+    Urutan pemanggilan di generate(): Gemini -> OpenRouter -> Ollama.
 
-    Ollama TETAP dipertahankan sebagai fallback darurat paling akhir (mis.
-    OpenRouter kehabisan kredit atau down total) -- bukan lagi otak utama,
-    hanya jaring pengaman. Kalau ternyata itu juga tidak diinginkan (mengingat
-    keluhan soal keterbatasan hardware-nya), gampang dicabut: hapus panggilan
-    _call_ollama() di generate() dan biarkan generate() langsung raise begitu
-    OpenRouter gagal.
+    Gemini dipakai sebagai otak utama (key di GEMINI_API_KEYS). Kalau semua
+    key Gemini gagal (kuota habis / key invalid / model tidak tersedia),
+    otomatis jatuh ke OpenRouter (OPENROUTER_API_KEYS, model rotation), dan
+    kalau itu juga gagal total, terakhir ke Ollama lokal supaya app tetap
+    bisa menjawab tanpa koneksi internet.
+
+    Untuk mengubah lapisan otak utama cukup atur isi secrets:
+    kosongkan GEMINI_API_KEYS -> OpenRouter yang jadi otak utama;
+    kosongkan OPENROUTER_API_KEYS -> Gemini jatuh langsung ke Ollama.
     """
 
     def __init__(self):
-        self.api_keys: List[str] = self._load_api_keys()
+        # --- Gemini (otak utama) ---
+        self.gemini_keys: List[str] = self._load_keys("GEMINI_API_KEYS")
+        self.active_gemini_index = 0
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+        self.gemini_timeout = int(os.getenv("GEMINI_TIMEOUT_SECONDS", 120))
+
+        # --- OpenRouter (fallback kedua) ---
+        self.api_keys: List[str] = self._load_keys("OPENROUTER_API_KEYS")
         self.active_index = 0
         self.model_name = os.getenv("OPENROUTER_MODEL", "z-ai/glm-4.5-air:free").strip()
         # --- Rotasi/fallback model OpenRouter ---
@@ -147,28 +158,42 @@ class AIService:
         # Keep-alive lama supaya model tetap "hangat" di RAM/VRAM antar-request.
         self.ollama_keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 
-        if not self.api_keys:
+        if not self.gemini_keys:
             logger.warning(
-                "OPENROUTER_API_KEYS kosong/tidak ditemukan di secrets.toml -- "
-                "semua request akan langsung memakai fallback lokal Ollama."
+                "GEMINI_API_KEYS kosong/tidak ditemukan di secrets.toml -- "
+                "otak utama jatuh ke OpenRouter (kalau ada), lalu Ollama lokal."
             )
         else:
             logger.info(
-                f"AI Service (OpenRouter) terkonfigurasi dengan {len(self.api_keys)} "
-                f"API key, model rotation order={self.model_order or [self.model_name]}, "
+                f"AI Service (Gemini) terkonfigurasi dengan {len(self.gemini_keys)} "
+                f"API key, model={self.gemini_model}."
+            )
+
+        if not self.api_keys:
+            logger.warning(
+                "OPENROUTER_API_KEYS kosong/tidak ditemukan -- OpenRouter dilewati "
+                "sebagai fallback; Ollama lokal jadi jaring pengaman terakhir."
+            )
+        else:
+            logger.info(
+                f"OpenRouter fallback terkonfigurasi: {len(self.api_keys)} API key, "
+                f"model rotation order={self.model_order or [self.model_name]}, "
                 f"allow_fallbacks={self.allow_fallbacks}."
             )
 
-    def _load_api_keys(self) -> List[str]:
+    def _load_keys(self, name: str) -> List[str]:
+        """Baca daftar API key dari secrets.toml (list atau string dipisah
+        koma), fallback ke env var bernama sama. `name` = nama entri di
+        secrets (mis. "GEMINI_API_KEYS" / "OPENROUTER_API_KEYS")."""
         raw = None
         if st is not None:
             try:
-                raw = st.secrets.get("OPENROUTER_API_KEYS", None)
+                raw = st.secrets.get(name, None)
             except Exception:
                 raw = None
 
         if raw is None:
-            raw = os.getenv("OPENROUTER_API_KEYS", "")
+            raw = os.getenv(name, "")
 
         if isinstance(raw, str):
             keys = [k.strip() for k in raw.split(",") if k.strip()]
@@ -177,6 +202,11 @@ class AIService:
         else:
             keys = []
         return keys
+
+    def _rotate_gemini_key(self) -> None:
+        if not self.gemini_keys:
+            return
+        self.active_gemini_index = (self.active_gemini_index + 1) % len(self.gemini_keys)
 
     def _rotate_key(self) -> None:
         """OpenRouter tidak butuh objek client stateful seperti Gemini --
@@ -196,6 +226,67 @@ class AIService:
         if self.openrouter_app_name:
             headers["X-Title"] = self.openrouter_app_name
         return headers
+
+    def _call_gemini(self, prompt: str, force_json: bool = False, system_prompt: str = None) -> str:
+        """Panggil Gemini lewat REST generateContent.
+
+        - `system_prompt` dikirim sebagai `systemInstruction` (setara role
+          "system"), `prompt` sebagai isi role "user" -- sama seperti
+          _build_messages() di provider lain.
+        - `force_json` -> generationConfig.responseMimeType = "application/json".
+        """
+        if not self.gemini_keys:
+            raise Exception("Gemini API key belum terkonfigurasi.")
+        api_key = self.gemini_keys[self.active_gemini_index]
+
+        url = f"{GEMINI_API_BASE}/models/{self.gemini_model}:generateContent"
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        }
+        if system_prompt:
+            payload["systemInstruction"] = {"parts": [{"text": system_prompt.strip()}]}
+        if force_json:
+            payload["generationConfig"] = {"responseMimeType": "application/json"}
+
+        try:
+            response = requests.post(
+                url,
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json=payload,
+                timeout=self.gemini_timeout,
+            )
+        except requests.exceptions.ConnectionError as e:
+            raise Exception(f"Tidak bisa terhubung ke Gemini: {e}")
+        except requests.exceptions.Timeout as e:
+            raise Exception(f"Gemini timeout setelah {self.gemini_timeout}s: {e}")
+
+        if response.status_code == 429:
+            raise Exception("Gemini rate limit / kuota habis (429).")
+        if response.status_code in (400, 401, 403, 404):
+            raise Exception(
+                f"Gemini menolak permintaan (HTTP {response.status_code}) -- key salah/kadaluarsa "
+                f"atau model '{self.gemini_model}' tidak tersedia untuk key ini. Detail: {response.text[:300]}"
+            )
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            raise Exception(f"Gemini mengembalikan error HTTP {response.status_code}: {e}")
+
+        data = response.json()
+        candidates = data.get("candidates") or []
+        if not candidates:
+            err = data.get("error", {}) or {}
+            feedback = data.get("promptFeedback", {}) or {}
+            raise Exception(
+                f"Gemini tidak mengembalikan kandidat: {err.get('message') or feedback or data}"
+            )
+
+        parts = (candidates[0].get("content") or {}).get("parts") or []
+        text = "".join(p.get("text", "") for p in parts).strip()
+        if not text:
+            finish = candidates[0].get("finishReason", "")
+            raise EmptyResponseError(f"Gemini mengembalikan respons kosong (finishReason={finish}).")
+        return text
 
     def _call_openrouter(self, prompt: str, force_json: bool = False, system_prompt: str = None) -> str:
         if not self.api_keys:
@@ -339,8 +430,9 @@ class AIService:
     def warm_up(self) -> bool:
         """Muat model ke memori Ollama lebih awal (saat app start) supaya
         KALAU sampai jatuh ke fallback, request pertama tidak menanggung
-        biaya cold-load model. OpenRouter (otak utama) tidak butuh warm-up
-        sama sekali -- tidak ada model lokal yang perlu dimuat.
+        biaya cold-load model. Gemini/OpenRouter (otak utama & fallback
+        pertama) tidak butuh warm-up sama sekali -- tidak ada model lokal
+        yang perlu dimuat.
 
         DIPANGGIL SECARA SINKRON saat halaman Home pertama kali dimuat,
         SEBELUM konten apa pun dirender -- jadi kalau ini lambat, seluruh
@@ -352,8 +444,8 @@ class AIService:
         khusus untuk ping ini (beda dari self.ollama_timeout yang dipakai
         generate() sungguhan, defaultnya 120s -- terlalu lama untuk sekadar
         'apakah Ollama ada?')."""
-        if self.api_keys:
-            logger.info("OpenRouter terkonfigurasi -- warm-up Ollama dilewati (fallback tidak akan dipakai kecuali OpenRouter gagal).")
+        if self.gemini_keys or self.api_keys:
+            logger.info("Gemini/OpenRouter terkonfigurasi -- warm-up Ollama dilewati (fallback tidak dipakai kecuali cloud gagal).")
             return False
         try:
             self._call_ollama("ping", force_json=False, timeout_override=WARM_UP_TIMEOUT_SECONDS)
@@ -366,12 +458,36 @@ class AIService:
     def check_status(self) -> dict:
         """Cek status AI provider secara RINGAN (tanpa generate() penuh) --
         dipakai oleh status bar di setiap halaman, jadi harus cepat & murah.
+        Gemini: panggil endpoint /v1beta/models untuk memvalidasi key.
         OpenRouter: panggil endpoint /api/v1/key (bukan chat completion) untuk
         memvalidasi key + baca sisa kredit, dengan timeout pendek.
         Ollama: 1 request kecil ke /api/tags dengan timeout pendek (hanya
-        relevan kalau OpenRouter tidak terkonfigurasi sama sekali).
+        relevan kalau Gemini & OpenRouter tidak terkonfigurasi sama sekali).
         Return: {"provider": str, "ok": bool, "detail": str}
         """
+        if self.gemini_keys:
+            api_key = self.gemini_keys[self.active_gemini_index]
+            try:
+                resp = requests.get(GEMINI_MODELS_URL, headers={"x-goog-api-key": api_key}, timeout=5)
+                if resp.status_code in (400, 401, 403):
+                    return {
+                        "provider": "Gemini",
+                        "ok": False,
+                        "detail": f"{len(self.gemini_keys)} API key ada tapi key aktif ditolak (HTTP {resp.status_code}).",
+                    }
+                resp.raise_for_status()
+                return {
+                    "provider": "Gemini",
+                    "ok": True,
+                    "detail": f"{len(self.gemini_keys)} API key terkonfigurasi, model={self.gemini_model}",
+                }
+            except requests.exceptions.RequestException as e:
+                return {
+                    "provider": "Gemini",
+                    "ok": False,
+                    "detail": f"Key terkonfigurasi tapi validasi gagal (invalid/timeout?): {e}",
+                }
+
         if self.api_keys:
             api_key = self.api_keys[self.active_index]
             try:
@@ -411,19 +527,37 @@ class AIService:
             return {
                 "provider": "Tidak ada",
                 "ok": False,
-                "detail": f"OpenRouter tidak dikonfigurasi & Ollama tidak terjangkau di {self.ollama_base_url} ({e})",
+                "detail": f"Gemini/OpenRouter tidak dikonfigurasi & Ollama tidak terjangkau di {self.ollama_base_url} ({e})",
             }
 
     def generate(self, prompt: str, force_json: bool = False, system_prompt: str = None) -> str:
-        """OpenRouter (GLM-5.2) dulu sebagai otak utama, fallback ke Ollama
-        lokal HANYA kalau OpenRouter gagal total/tidak terkonfigurasi.
+        """Gemini dulu sebagai otak utama, lalu OpenRouter, lalu Ollama lokal
+        HANYA kalau dua provider cloud di atas gagal total/tidak
+        terkonfigurasi.
 
-        `system_prompt`: instruksi TETAP (opsional) yang dikirim sebagai
-        pesan role "system", terpisah dari `prompt` (data/korpus dinamis
-        yang tetap role "user") -- diteruskan APA ADANYA ke kedua provider
-        (OpenRouter & Ollama) lewat _build_messages() supaya perilakunya
-        konsisten terlepas dari provider mana yang aktif. Pemanggil lama
-        yang belum dimigrasi cukup tidak mengisi parameter ini."""
+        `system_prompt`: instruksi TETAP (opsional) yang dikirim terpisah
+        dari `prompt` (data/korpus dinamis) -- diteruskan APA ADANYA ke semua
+        provider supaya perilakunya konsisten terlepas dari provider mana
+        yang aktif. Pemanggil lama yang belum dimigrasi cukup tidak mengisi
+        parameter ini."""
+
+        # 1) Gemini (otak utama) -- rotasi key kalau ada lebih dari satu.
+        if self.gemini_keys:
+            last_error = None
+            attempts = 0
+            while attempts < len(self.gemini_keys):
+                try:
+                    return self._call_gemini(prompt, force_json=force_json, system_prompt=system_prompt)
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"Gemini gagal ({e}), merotasi key...")
+                    self._rotate_gemini_key()
+                    attempts += 1
+            logger.warning(f"Gemini gagal total ({last_error}). Mencoba fallback ke OpenRouter...")
+        else:
+            logger.info("Gemini tidak terkonfigurasi (GEMINI_API_KEYS kosong).")
+
+        # 2) OpenRouter (fallback kedua) -- rotasi key.
         if self.api_keys:
             last_error = None
             attempts = 0
@@ -437,13 +571,14 @@ class AIService:
                     attempts += 1
             logger.warning(f"OpenRouter gagal total ({last_error}). Mencoba fallback ke Ollama lokal...")
         else:
-            logger.info("OpenRouter tidak terkonfigurasi (OPENROUTER_API_KEYS kosong). Memakai Ollama lokal.")
+            logger.info("OpenRouter tidak terkonfigurasi (OPENROUTER_API_KEYS kosong).")
 
+        # 3) Ollama lokal (jaring pengaman terakhir).
         try:
             return self._call_ollama(prompt, force_json=force_json, system_prompt=system_prompt)
         except Exception as ollama_err:
             raise Exception(
-                f"OpenRouter gagal/tidak terkonfigurasi dan fallback Ollama lokal juga gagal: {ollama_err}"
+                f"Gemini & OpenRouter gagal/tidak terkonfigurasi dan fallback Ollama lokal juga gagal: {ollama_err}"
             )
 
 
