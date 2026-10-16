@@ -425,7 +425,7 @@ div[data-testid="stDataFrame"] * {
    8. SIDEBAR (Frosted Glass Sidebar)
    ========================================================= */
 [data-testid="stSidebar"] {
-    background-color: rgba(255, 255, 255, 0.6) !important;
+    background-color: rgba(8, 18, 32, 0.88) !important;
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
     border-right: 1px solid var(--tbl-border) !important;
@@ -991,70 +991,43 @@ ul[role="listbox"] li:hover { background-color: var(--tbl-primary-soft) !importa
 .badge-low { background-color: rgba(52, 211, 153, 0.15) !important; color: #6ee7b7 !important; }
 
 /* =========================================================
-   14. JARVIS MOTION -- pure-CSS arc reactor
-   Cincin konsentris + inti berdenyut, semuanya CSS
-   (tanpa JS/gambar), jadi animasi berjalan di browser dan TIDAK
-   menambah RAM server sama sekali. Markup: lihat streamlit_app.py.
+   14. BRAND MARK MOTION -- pulse pada brand mark sidebar
+   (Animasi arc reactor JARVIS dihapus.)
    ========================================================= */
-@keyframes jr-spin { to { transform: rotate(360deg); } }
-@keyframes jr-spin-rev { to { transform: rotate(-360deg); } }
-@keyframes jr-pulse {
-    0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 0 18px 2px rgba(34, 211, 238, 0.55),
-                    inset 0 0 12px rgba(56, 189, 248, 0.65);
-    }
-    50% {
-        transform: scale(1.08);
-        box-shadow: 0 0 34px 9px rgba(34, 211, 238, 0.78),
-                    inset 0 0 22px rgba(56, 189, 248, 0.95);
-    }
-}
 @keyframes jr-brand-pulse {
     0%, 100% { box-shadow: 0 0 14px rgba(34, 211, 238, 0.45); }
     50% { box-shadow: 0 0 26px rgba(34, 211, 238, 0.90); }
 }
 
-.jarvis-reactor {
-    position: relative;
-    width: 220px;
-    height: 220px;
-    margin: 4px auto 22px;
-}
-.jarvis-reactor > * { position: absolute; border-radius: 50%; }
-
-.jr-ring--outer {
-    inset: 0;
-    border: 2px dashed rgba(34, 211, 238, 0.45);
-    animation: jr-spin 22s linear infinite;
-}
-.jr-ring--mid {
-    inset: 18%;
-    border: 2px solid rgba(56, 189, 248, 0.30);
-    border-top-color: rgba(34, 211, 238, 0.90);
-    border-right-color: rgba(34, 211, 238, 0.60);
-    box-shadow: 0 0 18px rgba(34, 211, 238, 0.22);
-    animation: jr-spin-rev 13s linear infinite;
-}
-.jr-ring--inner {
-    inset: 34%;
-    border: 2px dashed rgba(34, 211, 238, 0.55);
-    animation: jr-spin 9s linear infinite;
-}
-.jr-core {
-    inset: 0;
-    margin: auto;
-    width: 34%;
-    height: 34%;
-    background: radial-gradient(circle at 50% 45%,
-        #eafcff 0%, var(--tbl-accent-2) 34%, #0a6e8c 72%, #04222e 100%);
-    animation: jr-pulse 2.6s ease-in-out infinite;
-}
-
 /* Brand mark berdenyut selaras -- tampil di sidebar SEMUA halaman */
 .d-brand-logo { animation: jr-brand-pulse 3.4s ease-in-out infinite; }
 
+/* =========================================================
+   15. SIDEBAR TOGGLE -- ikon buka/tutup sidebar selalu tampil
+   Streamlit menyembunyikan tombol collapse/expand (muncul hanya
+   saat hover); dipaksa tampil supaya sidebar bisa dibuka/ditutup
+   lewat ikon " yang terlihat.
+   ========================================================= */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stExpandSidebarButton"] {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stExpandSidebarButton"] button {
+    border-radius: var(--tbl-radius-sm) !important;
+    transition: background-color 0.15s ease-in-out !important;
+}
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="stExpandSidebarButton"] button:hover {
+    background-color: var(--tbl-primary-soft) !important;
+}
+[data-testid="stSidebarCollapseButton"] span,
+[data-testid="stExpandSidebarButton"] span {
+    color: var(--tbl-primary) !important;
+}
+
 /* Aksesibilitas: hormati pengguna yang meminta gerakan minimal */
 @media (prefers-reduced-motion: reduce) {
-    .jarvis-reactor *, .d-brand-logo { animation: none !important; }
+    .d-brand-logo { animation: none !important; }
 }

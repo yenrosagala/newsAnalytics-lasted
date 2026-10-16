@@ -23,19 +23,6 @@ def main():
         "tren prediktif, dan analisis mendalam secara real-time."
     )
 
-    # Animasi JARVIS (arc reactor) -- murni CSS, jalankan di browser tanpa JS.
-    st.markdown(
-        """
-        <div class="jarvis-reactor" title="JARVIS online">
-            <div class="jr-ring--outer"></div>
-            <div class="jr-ring--mid"></div>
-            <div class="jr-ring--inner"></div>
-            <div class="jr-core"></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     st.markdown("---")
 
     # ==========================================
